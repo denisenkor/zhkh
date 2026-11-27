@@ -93,7 +93,8 @@ class TceCrimeaClient:
         except TceCrimeaAuthError:
             raise
         except (aiohttp.ClientError, TimeoutError) as err:
-            raise HomeAssistantError("Connection to provider failed") from err
+            detail = f"HTTP {err.status}" if isinstance(err, aiohttp.ClientResponseError) else type(err).__name__
+            raise HomeAssistantError(f"Connection to provider failed ({detail})") from err
 
     async def async_get_balance(self) -> Decimal:
         """Get balance from the authenticated services page."""
