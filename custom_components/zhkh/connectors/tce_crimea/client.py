@@ -5,8 +5,9 @@ from __future__ import annotations
 import logging
 import re
 from decimal import Decimal, InvalidOperation
+from html import escape as html_escape
 from http.cookies import CookieError, SimpleCookie
-from urllib.parse import urljoin
+from urllib.parse import quote, quote_plus, urljoin
 
 import aiohttp
 from bs4 import BeautifulSoup
@@ -118,7 +119,15 @@ class TceCrimeaClient:
             (self._password, "<password-redacted>"),
         ):
             if secret:
-                text_preview = text_preview.replace(secret, replacement)
+                for secret_variant in {
+                    secret,
+                    quote(secret),
+                    quote_plus(secret),
+                    html_escape(secret),
+                }:
+                    text_preview = text_preview.replace(
+                        secret_variant, replacement
+                    )
 
         # Redact JWTs and common token/credential values that may be echoed by the site.
         text_preview = re.sub(
@@ -130,7 +139,8 @@ class TceCrimeaClient:
             text_preview,
         )
         text_preview = re.sub(
-            r"(?i)\b(token|csrf|form_token|password|pass)\s*[:=]\s*"
+            r"(?i)\b(token|csrf(?:_token)?|form_token|access_token|auth_token|"
+            r"password|pass)\s*[:=]\s*"
             r"[^\s&,;]+",
             r"\1=<redacted>",
             text_preview,
