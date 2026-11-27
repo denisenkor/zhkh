@@ -7,7 +7,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import DeviceInfo
 
-from .const import DOMAIN, PROVIDER_CRIMEA_ENERGY
+from .const import DOMAIN, PROVIDER_CRIMEA_ENERGY, PROVIDER_CRIMEAGASNET, PROVIDER_CRIMEAGASNET_NAME
 from .coordinator import ZhkhCoordinator
 
 
@@ -47,6 +47,26 @@ async def async_setup_entry(
                         manufacturer="Крымэнерго",
                         model="Лицевой счёт",
                         configuration_url="https://lk.crimea-energy.ru",
+                    ),
+                )
+            )
+        async_add_entities(entities)
+        return
+
+    if coordinator.provider == PROVIDER_CRIMEAGASNET:
+        entities = []
+        for account in (coordinator.data or {}).get("accounts", []):
+            account_id = str(account["id"])
+            entities.append(
+                RefreshButton(
+                    coordinator,
+                    f"{entry.entry_id}_{account_id}_refresh",
+                    DeviceInfo(
+                        identifiers={(DOMAIN, f"{entry.entry_id}_{account_id}")},
+                        name=f"Лицевой счёт {account['account']}",
+                        manufacturer=PROVIDER_CRIMEAGASNET_NAME,
+                        model="Лицевой счёт",
+                        configuration_url="https://lkk.crimeagasnet.ru",
                     ),
                 )
             )
