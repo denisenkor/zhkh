@@ -38,13 +38,21 @@ async def async_setup_entry(
 
     if coordinator.provider == PROVIDER_CRIMEA_ECOR:
         async_add_entities(
-            [CrimeaEcorProviderSensor(coordinator, entry), CrimeaEcorDebtSensor(coordinator, entry)]
+            [
+                CrimeaEcorProviderSensor(coordinator, entry),
+                CrimeaEcorDebtSensor(coordinator, entry),
+                CrimeaEcorLastUpdateSensor(coordinator, entry),
+            ]
         )
         return
 
     if coordinator.provider == PROVIDER_EISGKH:
         async_add_entities(
-            [EisgkhProviderSensor(coordinator, entry), EisgkhDebtSensor(coordinator, entry)]
+            [
+                EisgkhProviderSensor(coordinator, entry),
+                EisgkhDebtSensor(coordinator, entry),
+                EisgkhLastUpdateSensor(coordinator, entry),
+            ]
         )
         return
 
@@ -168,6 +176,22 @@ class CrimeaEcorDebtSensor(CrimeaEcorBaseSensor):
         return (self.coordinator.data or {}).get("balance")
 
 
+class CrimeaEcorLastUpdateSensor(CrimeaEcorBaseSensor):
+    """Timestamp of the last successful data update."""
+
+    def __init__(self, coordinator, entry) -> None:
+        super().__init__(coordinator, entry, "last_update")
+        self._attr_name = "Последнее обновление"
+        self._attr_device_class = SensorDeviceClass.TIMESTAMP
+        self._attr_icon = "mdi:clock-check-outline"
+
+    @property
+    def native_value(self):
+        if self.coordinator.data:
+            return self.coordinator.data.get("last_updated")
+        return self.coordinator._last_updated
+
+
 class EisgkhBaseSensor(ZhkhBaseSensor):
     """Base sensor for НО «РФ КРМД РК» personal account."""
 
@@ -209,6 +233,22 @@ class EisgkhDebtSensor(EisgkhBaseSensor):
     @property
     def native_value(self):
         return (self.coordinator.data or {}).get("balance")
+
+
+class EisgkhLastUpdateSensor(EisgkhBaseSensor):
+    """Timestamp of the last successful data update."""
+
+    def __init__(self, coordinator, entry) -> None:
+        super().__init__(coordinator, entry, "last_update")
+        self._attr_name = "Последнее обновление"
+        self._attr_device_class = SensorDeviceClass.TIMESTAMP
+        self._attr_icon = "mdi:clock-check-outline"
+
+    @property
+    def native_value(self):
+        if self.coordinator.data:
+            return self.coordinator.data.get("last_updated")
+        return self.coordinator._last_updated
 
 
 class CrimeaGasnetAccountSensors:
