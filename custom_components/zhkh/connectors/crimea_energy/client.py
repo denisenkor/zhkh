@@ -67,7 +67,7 @@ class CrimeaEnergyClient:
 
     async def async_login(self) -> None:
         """Authenticate and keep the returned token in memory."""
-        form = aiohttp.FormData()
+        form = aiohttp.FormData(default_to_multipart=True)
         form.add_field("type", "user")
         form.add_field("action", "login")
         form.add_field("token", "undefined")
