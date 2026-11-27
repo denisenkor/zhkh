@@ -115,8 +115,12 @@ class CrimeaEcorClient:
     def _parse_amount(raw_value: str) -> Decimal:
         """Parse a Russian-formatted amount."""
         normalized = raw_value.replace("\u00a0", " ").replace("\u202f", " ")
-        normalized = normalized.replace(" ", "").replace(",", ".")
-        normalized = re.sub(r"[^0-9+.-]", "", normalized)
+        match = re.search(r"[+-]?\d[\d ]*(?:[.,]\d+)?", normalized)
+        if match is None:
+            raise HomeAssistantError(
+                "Крымэкоресурсы вернули некорректное значение задолженности"
+            )
+        normalized = match.group(0).replace(" ", "").replace(",", ".")
         try:
             return Decimal(normalized)
         except (InvalidOperation, ValueError) as err:
