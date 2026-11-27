@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from decimal import Decimal, InvalidOperation
 from urllib.parse import urljoin
@@ -9,6 +10,8 @@ from urllib.parse import urljoin
 import aiohttp
 from bs4 import BeautifulSoup
 from homeassistant.exceptions import HomeAssistantError
+
+_LOGGER = logging.getLogger(__name__)
 
 BASE_URL = "https://lk.tce.crimea.ru"
 LOGIN_URL = f"{BASE_URL}/cabinet/"
@@ -37,14 +40,59 @@ class TceCrimeaClient:
         )
         self._logged_in = False
 
+    def _log_response(self, stage: str, response: aiohttp.ClientResponse, body: str) -> None:
+        """Log useful response diagnostics without exposing credentials or private data."""
+        safe_headers = {
+            key: response.headers.get(key)
+            for key in ("Content-Type", "Content-Length", "Location", "Server", "Via")
+            if response.headers.get(key) is not None
+        }
+        cookies = []
+        for cookie in response.cookies.values():
+            cookies.append({
+                "name": cookie.key,
+                "value": "<redacted>",
+                "domain": cookie["domain"] or response.url.host,
+                "path": cookie["path"] or "/",
+                "secure": bool(cookie["secure"]),
+                "httponly": bool(cookie["httponly"]),
+                "samesite": cookie["samesite"],
+            })
+
+        soup = BeautifulSoup(body, "html.parser")
+        for node in soup.select("script, style, .info_column_primary"):
+            node.decompose()
+        for field in soup.select("input"):
+            field.attrs.pop("value", None)
+        text_preview = " ".join(soup.get_text(" ", strip=True).split())[:500]
+        if self._account:
+            text_preview = text_preview.replace(self._account, "<account-redacted>")
+        if self._password:
+            text_preview = text_preview.replace(self._password, "<password-redacted>")
+
+        _LOGGER.debug(
+            "TCE %s response: status=%s url=%s final_url=%s headers=%s "
+            "cookies=%s cookie_jar_names=%s body_length=%s body_preview=%r",
+            stage,
+            response.status,
+            response.request_info.real_url,
+            response.url,
+            safe_headers,
+            cookies,
+            sorted(self._session.cookie_jar.filter_cookies(response.url).keys()),
+            len(body),
+            text_preview,
+        )
+
     async def async_login(self) -> None:
         """Fetch Drupal login form, submit it, then verify the session."""
         stage = "GET login page"
         request_url = LOGIN_URL
         try:
             async with self._session.get(LOGIN_URL) as response:
-                response.raise_for_status()
                 login_html = await response.text()
+                self._log_response(stage, response, login_html)
+                response.raise_for_status()
 
             soup = BeautifulSoup(login_html, "html.parser")
             form = soup.select_one("form#user-login-form")
@@ -74,19 +122,18 @@ class TceCrimeaClient:
                 allow_redirects=True,
                 headers={"Referer": LOGIN_URL},
             ) as response:
+                post_html = await response.text()
+                self._log_response(stage, response, post_html)
                 response.raise_for_status()
-                # Consume the response before requesting the authenticated page.
-                await response.read()
 
-            # Always verify authentication by requesting the page the user sees
-            # after login. A successful POST status alone does not prove login.
             stage = "GET services page after login"
             request_url = SERVICES_URL
             async with self._session.get(
                 SERVICES_URL, headers={"Referer": LOGIN_URL}
             ) as response:
-                response.raise_for_status()
                 html = await response.text()
+                self._log_response(stage, response, html)
+                response.raise_for_status()
                 final_url = str(response.url)
 
             check = BeautifulSoup(html, "html.parser")
@@ -113,8 +160,9 @@ class TceCrimeaClient:
             await self.async_login()
         try:
             async with self._session.get(SERVICES_URL) as response:
-                response.raise_for_status()
                 html = await response.text()
+                self._log_response("GET services page", response, html)
+                response.raise_for_status()
                 final_url = str(response.url)
 
             page = BeautifulSoup(html, "html.parser")
@@ -125,8 +173,9 @@ class TceCrimeaClient:
                 self._logged_in = False
                 await self.async_login()
                 async with self._session.get(SERVICES_URL) as response:
-                    response.raise_for_status()
                     html = await response.text()
+                    self._log_response("GET services page after re-login", response, html)
+                    response.raise_for_status()
 
             return self._parse_balance(html)
         except (aiohttp.ClientError, TimeoutError) as err:
