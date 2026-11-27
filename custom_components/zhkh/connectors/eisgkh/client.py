@@ -1,4 +1,4 @@
-"""HTTP client for the ЕИС ЖКХ personal account."""
+"""HTTP client for the НО «РФ КРМД РК» personal account."""
 
 from __future__ import annotations
 
@@ -75,11 +75,11 @@ class EisgkhClient:
         soup = BeautifulSoup(login_html, "html.parser")
         form = soup.select_one('form[name="auth"]')
         if form is None:
-            raise HomeAssistantError("На странице ЕИС ЖКХ не найдена форма авторизации")
+            raise HomeAssistantError("На странице НО «РФ КРМД РК» не найдена форма авторизации")
 
         path_input = form.select_one('input[type="hidden"][name="path"]')
         if path_input is None or not path_input.get("value"):
-            raise HomeAssistantError("В форме входа ЕИС ЖКХ не найден параметр path")
+            raise HomeAssistantError("В форме входа НО «РФ КРМД РК» не найден параметр path")
 
         action = form.get("action") or LOGIN_URL
         post_url = urljoin(LOGIN_URL, action)
@@ -95,19 +95,19 @@ class EisgkhClient:
                 "path": path_input["value"],
                 "auth": submit_value,
             },
-            stage="авторизация ЕИС ЖКХ",
+            stage="авторизация НО «РФ КРМД РК»",
         )
 
         pay_html = await self._request(
-            "GET", PAY_URL, stage="загрузка страницы оплаты ЕИС ЖКХ"
+            "GET", PAY_URL, stage="загрузка страницы оплаты НО «РФ КРМД РК»"
         )
         pay_soup = BeautifulSoup(pay_html, "html.parser")
         if pay_soup.select_one('input[name="sum"]') is None:
             response_soup = BeautifulSoup(response_html, "html.parser")
             if response_soup.select_one('form[name="auth"]') is not None:
-                raise EisgkhAuthError("ЕИС ЖКХ отклонила учётные данные")
+                raise EisgkhAuthError("НО «РФ КРМД РК» отклонила учётные данные")
             raise HomeAssistantError(
-                "После авторизации ЕИС ЖКХ не найдено поле итоговой суммы платежа"
+                "После авторизации НО «РФ КРМД РК» не найдено поле итоговой суммы платежа"
             )
         self._logged_in = True
 
@@ -117,13 +117,13 @@ class EisgkhClient:
         normalized = raw_value.replace("\u00a0", " ").replace("\u202f", " ")
         match = re.search(r"[+-]?\d[\d ]*(?:[.,]\d+)?", normalized)
         if match is None:
-            raise HomeAssistantError("ЕИС ЖКХ вернула некорректную сумму платежа")
+            raise HomeAssistantError("НО «РФ КРМД РК» вернула некорректную сумму платежа")
         normalized = match.group(0).replace(" ", "").replace(",", ".")
         try:
             return Decimal(normalized)
         except (InvalidOperation, ValueError) as err:
             raise HomeAssistantError(
-                "ЕИС ЖКХ вернула некорректную сумму платежа"
+                "НО «РФ КРМД РК» вернула некорректную сумму платежа"
             ) from err
 
     @classmethod
@@ -133,10 +133,10 @@ class EisgkhClient:
         amount_input = soup.select_one('input[name="sum"]')
         if amount_input is None or not amount_input.get("value"):
             raise HomeAssistantError(
-                "На странице оплаты ЕИС ЖКХ не найдено значение итоговой суммы"
+                "На странице оплаты НО «РФ КРМД РК» не найдено значение итоговой суммы"
             )
         return {
-            "provider": "ЕИС ЖКХ",
+            "provider": "НО «РФ КРМД РК»",
             "balance": cls._parse_amount(amount_input["value"]),
         }
 
@@ -145,13 +145,13 @@ class EisgkhClient:
         if not self._logged_in:
             await self.async_login()
         html = await self._request(
-            "GET", PAY_URL, stage="получение суммы платежа ЕИС ЖКХ"
+            "GET", PAY_URL, stage="получение суммы платежа НО «РФ КРМД РК»"
         )
         if BeautifulSoup(html, "html.parser").select_one('input[name="sum"]') is None:
             self._logged_in = False
             await self.async_login()
             html = await self._request(
-                "GET", PAY_URL, stage="повторное получение суммы платежа ЕИС ЖКХ"
+                "GET", PAY_URL, stage="повторное получение суммы платежа НО «РФ КРМД РК»"
             )
         return self._parse_data(html)
 
