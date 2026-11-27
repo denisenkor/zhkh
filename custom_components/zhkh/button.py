@@ -91,7 +91,7 @@ async def async_setup_entry(
                         name=entry.title,
                         manufacturer=PROVIDER_EISGKH_NAME,
                         model="Лицевой счёт",
-                        configuration_url="https://lk091.eisgkh.ru/index.htm",
+                        configuration_url="http://kaprem82.ru/",
                     ),
                 )
             ]
