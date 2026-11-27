@@ -271,6 +271,9 @@ class CrimeaGasnetAccountSensors:
             CrimeaGasnetDebtSensor(
                 coordinator, account, device, f"{prefix}_debt"
             ),
+            CrimeaGasnetLastUpdateSensor(
+                coordinator, account, device, f"{prefix}_last_update"
+            ),
         ]
 
 
@@ -319,6 +322,22 @@ class CrimeaGasnetDebtSensor(CrimeaGasnetAccountEntity):
     @property
     def native_value(self):
         return self.account.get("balance") if self.account else None
+
+class CrimeaGasnetLastUpdateSensor(CrimeaGasnetAccountEntity):
+    """Timestamp of the last successful data update."""
+
+    def __init__(self, coordinator, account, device, unique_id) -> None:
+        super().__init__(coordinator, account, device, unique_id)
+        self._attr_name = "Последнее обновление"
+        self._attr_device_class = SensorDeviceClass.TIMESTAMP
+        self._attr_icon = "mdi:clock-check-outline"
+
+    @property
+    def native_value(self):
+        if self.coordinator.data:
+            return self.coordinator.data.get("last_updated")
+        return self.coordinator._last_updated
+
 
 class CrimeaEnergyBillSensors:
     """Create a separate device and sensors for one personal account."""
