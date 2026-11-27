@@ -19,7 +19,7 @@ PROVIDER_CRIMEA_ECOR = "crimea_ecor"
 PROVIDER_CRIMEA_ECOR_NAME = "Крымэкоресурсы"
 
 PROVIDER_EISGKH = "eisgkh"
-PROVIDER_EISGKH_NAME = "ЕИС ЖКХ"
+PROVIDER_EISGKH_NAME = "НО «РФ КРМД РК»"
 
 DEFAULT_UPDATE_DAY = 1
 UPDATE_HOUR = 6
