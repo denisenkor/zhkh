@@ -109,7 +109,7 @@ class CrimeaGasnetClient:
         """Parse a Russian-formatted debt/advance amount."""
         normalized = raw_value.replace("\u00a0", " ").replace("\u202f", " ")
         normalized = normalized.replace(" ", "").replace(",", ".")
-        normalized = re.sub(r"[^0-9+\\-.]", "", normalized)
+        normalized = re.sub(r"[^0-9+.-]", "", normalized)
         try:
             return Decimal(normalized)
         except (InvalidOperation, ValueError) as err:
