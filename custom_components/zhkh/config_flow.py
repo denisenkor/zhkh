@@ -103,14 +103,14 @@ class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Configure a Crimea Energy account."""
         errors = {}
         if user_input is not None:
-            email = user_input["email"].strip()
+            email = user_input["crimea_energy_email"].strip()
             email_key = hashlib.sha256(email.lower().encode("utf-8")).hexdigest()[:20]
             await self.async_set_unique_id(
                 f"{PROVIDER_CRIMEA_ENERGY}_{email_key}"
             )
             self._abort_if_unique_id_configured()
 
-            client = CrimeaEnergyClient(email, user_input[CONF_PASSWORD])
+            client = CrimeaEnergyClient(email, user_input["crimea_energy_password"])
             try:
                 await client.async_get_bills()
             except CrimeaEnergyAuthError:
@@ -143,8 +143,8 @@ class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         schema = vol.Schema(
             {
-                vol.Required("email"): str,
-                vol.Required(CONF_PASSWORD): str,
+                vol.Required("crimea_energy_email"): str,
+                vol.Required("crimea_energy_password"): str,
             }
         )
         return self.async_show_form(
