@@ -51,14 +51,19 @@ class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             except TceCrimeaAuthError:
                 errors["base"] = "invalid_auth"
             except HomeAssistantError as err:
+                # Connector errors contain only our fixed diagnostics or HTTP status;
+                # never log credentials, cookies, response bodies, or form payloads.
                 _LOGGER.warning(
-                    "Provider validation failed (%s)", type(err).__name__
+                    "Provider validation failed (%s): %s",
+                    type(err).__name__,
+                    str(err),
                 )
                 errors["base"] = "cannot_connect"
             except Exception as err:  # noqa: BLE001
                 # Never log exception text: request details may contain credentials.
                 _LOGGER.error(
-                    "Unexpected provider validation error (%s)", type(err).__name__
+                    "Unexpected provider validation error (%s)",
+                    type(err).__name__,
                 )
                 errors["base"] = "cannot_connect"
             finally:
