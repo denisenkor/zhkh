@@ -75,7 +75,23 @@ class EisgkhClient:
         soup = BeautifulSoup(login_html, "html.parser")
         form = soup.select_one('form[name="auth"]')
         if form is None:
-            raise HomeAssistantError("На странице НО «РФ КРМД РК» не найдена форма авторизации")
+            # Some cabinet responses redirect an already-authenticated session
+            # straight to the payment page instead of returning the login form.
+            if soup.select_one('input[name="sum"]') is not None:
+                self._logged_in = True
+                return
+
+            pay_html = await self._request(
+                "GET", PAY_URL, stage="проверка авторизованной страницы оплаты"
+            )
+            pay_soup = BeautifulSoup(pay_html, "html.parser")
+            if pay_soup.select_one('input[name="sum"]') is not None:
+                self._logged_in = True
+                return
+
+            raise HomeAssistantError(
+                "На странице НО «РФ КРМД РК» не найдена форма авторизации"
+            )
 
         path_input = form.select_one('input[type="hidden"][name="path"]')
         if path_input is None or not path_input.get("value"):
