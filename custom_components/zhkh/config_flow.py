@@ -22,6 +22,8 @@ from .const import (
     PROVIDER_CRIMEAGASNET_NAME,
     PROVIDER_CRIMEA_ECOR,
     PROVIDER_CRIMEA_ECOR_NAME,
+    PROVIDER_EISGKH,
+    PROVIDER_EISGKH_NAME,
     PROVIDER_TCE,
     PROVIDER_TCE_NAME,
 )
@@ -34,6 +36,7 @@ from .connectors.crimeagasnet import (
     CrimeaGasnetClient,
 )
 from .connectors.crimea_ecor import CrimeaEcorAuthError, CrimeaEcorClient
+from .connectors.eisgkh import EisgkhAuthError, EisgkhClient
 from .connectors.tce_crimea import TceCrimeaAuthError, TceCrimeaClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -53,6 +56,7 @@ class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "crimea_energy": PROVIDER_CRIMEA_ENERGY_NAME,
                 "crimeagasnet": PROVIDER_CRIMEAGASNET_NAME,
                 "crimea_ecor": PROVIDER_CRIMEA_ECOR_NAME,
+                "eisgkh": PROVIDER_EISGKH_NAME,
             },
         )
 
@@ -270,6 +274,58 @@ class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
         return self.async_show_form(
             step_id="crimea_ecor",
+            data_schema=schema,
+            errors=errors,
+        )
+
+    async def async_step_eisgkh(self, user_input=None):
+        """Configure an ЕИС ЖКХ personal account."""
+        errors = {}
+        if user_input is not None:
+            account = user_input["eisgkh_account"].strip()
+            account_key = hashlib.sha256(account.encode("utf-8")).hexdigest()[:20]
+            await self.async_set_unique_id(f"{PROVIDER_EISGKH}_{account_key}")
+            self._abort_if_unique_id_configured()
+
+            client = EisgkhClient(account, user_input["eisgkh_password"])
+            try:
+                await client.async_get_data()
+            except EisgkhAuthError:
+                errors["base"] = "invalid_auth"
+            except HomeAssistantError as err:
+                _LOGGER.warning(
+                    "EIS ЖКХ validation failed (%s): %s",
+                    type(err).__name__,
+                    str(err),
+                )
+                errors["base"] = "cannot_connect"
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.error(
+                    "Unexpected ЕИС ЖКХ validation error (%s)",
+                    type(err).__name__,
+                )
+                errors["base"] = "cannot_connect"
+            finally:
+                await client.async_close()
+
+            if not errors:
+                return self.async_create_entry(
+                    title=f"{PROVIDER_EISGKH_NAME} ({account})",
+                    data={
+                        CONF_PROVIDER: PROVIDER_EISGKH,
+                        CONF_ACCOUNT: account,
+                        CONF_PASSWORD: user_input["eisgkh_password"],
+                    },
+                )
+
+        schema = vol.Schema(
+            {
+                vol.Required("eisgkh_account"): str,
+                vol.Required("eisgkh_password"): str,
+            }
+        )
+        return self.async_show_form(
+            step_id="eisgkh",
             data_schema=schema,
             errors=errors,
         )
