@@ -70,12 +70,13 @@ class TceCrimeaClient:
         if self._password:
             text_preview = text_preview.replace(self._password, "<password-redacted>")
         text_preview = re.sub(
-            r"(?i)\beyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\b",
+            r"(?i)\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b",
             "<token-redacted>",
             text_preview,
         )
 
-        _LOGGER.debug(
+        log_method = _LOGGER.warning if response.status >= 400 else _LOGGER.debug
+        log_method(
             "TCE %s response: status=%s url=%s final_url=%s headers=%s "
             "cookies=%s cookie_jar_names=%s body_length=%s body_preview=%r",
             stage,
