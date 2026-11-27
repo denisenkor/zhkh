@@ -28,6 +28,14 @@
           "crimeagasnet_mail": "Адрес электронной почты",
           "crimeagasnet_password": "Пароль"
         }
+      },
+      "crimea_ecor": {
+        "title": "Подключение Крымэкоресурсы",
+        "description": "Введите номер лицевого счёта и пароль от личного кабинета Крымэкоресурсы.",
+        "data": {
+          "crimea_ecor_account": "Номер лицевого счёта",
+          "crimea_ecor_password": "Пароль"
+        }
       }
     },
     "options": {
