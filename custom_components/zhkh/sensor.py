@@ -13,6 +13,8 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     DOMAIN,
     PROVIDER_CRIMEA_ENERGY,
+    PROVIDER_CRIMEAGASNET,
+    PROVIDER_CRIMEAGASNET_NAME,
     PROVIDER_TCE_NAME,
 )
 from .coordinator import ZhkhCoordinator
@@ -27,6 +29,13 @@ async def async_setup_entry(
         entities = []
         for bill in (coordinator.data or {}).get("bills", []):
             entities.extend(CrimeaEnergyBillSensors(coordinator, entry, bill).entities)
+        async_add_entities(entities)
+        return
+
+    if coordinator.provider == PROVIDER_CRIMEAGASNET:
+        entities = []
+        for account in (coordinator.data or {}).get("accounts", []):
+            entities.extend(CrimeaGasnetAccountSensors(coordinator, entry, account).entities)
         async_add_entities(entities)
         return
 
@@ -95,6 +104,76 @@ class LastUpdateSensor(ZhkhBaseSensor):
             return self.coordinator.data.get("last_updated")
         return self.coordinator._last_updated
 
+
+
+class CrimeaGasnetAccountSensors:
+    """Create exactly two sensors for one Крымгазсети personal account."""
+
+    def __init__(self, coordinator, entry, account: dict) -> None:
+        account_id = str(account["id"])
+        device = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry.entry_id}_{account_id}")},
+            name=f"Лицевой счёт {account['account']}",
+            manufacturer=PROVIDER_CRIMEAGASNET_NAME,
+            model="Лицевой счёт",
+            configuration_url="https://lkk.crimeagasnet.ru",
+        )
+        prefix = f"{entry.entry_id}_{account_id}"
+        self.entities = [
+            CrimeaGasnetProviderSensor(
+                coordinator, account, device, f"{prefix}_provider"
+            ),
+            CrimeaGasnetDebtSensor(
+                coordinator, account, device, f"{prefix}_debt"
+            ),
+        ]
+
+
+class CrimeaGasnetAccountEntity(CoordinatorEntity, SensorEntity):
+    """Base entity for a Крымгазсети personal account."""
+
+    def __init__(self, coordinator, account, device, unique_id: str) -> None:
+        super().__init__(coordinator)
+        self._account_id = str(account["id"])
+        self._attr_device_info = device
+        self._attr_unique_id = unique_id
+
+    @property
+    def account(self):
+        """Return the latest account data."""
+        for item in (self.coordinator.data or {}).get("accounts", []):
+            if str(item["id"]) == self._account_id:
+                return item
+        return None
+
+
+class CrimeaGasnetProviderSensor(CrimeaGasnetAccountEntity):
+    """Supplier / management name."""
+
+    def __init__(self, coordinator, account, device, unique_id) -> None:
+        super().__init__(coordinator, account, device, unique_id)
+        self._attr_name = "Поставщик"
+        self._attr_icon = "mdi:domain"
+
+    @property
+    def native_value(self):
+        return self.account.get("provider") if self.account else None
+
+
+class CrimeaGasnetDebtSensor(CrimeaGasnetAccountEntity):
+    """Debt (+) / advance (-) amount."""
+
+    def __init__(self, coordinator, account, device, unique_id) -> None:
+        super().__init__(coordinator, account, device, unique_id)
+        self._attr_name = "Задолженность"
+        self._attr_native_unit_of_measurement = "RUB"
+        self._attr_device_class = SensorDeviceClass.MONETARY
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_icon = "mdi:cash"
+
+    @property
+    def native_value(self):
+        return self.account.get("balance") if self.account else None
 
 class CrimeaEnergyBillSensors:
     """Create a separate device and sensors for one personal account."""
