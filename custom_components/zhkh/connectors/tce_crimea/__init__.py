@@ -1,5 +1,5 @@
 """Крымтеплокоммунэнерго connector."""
 
-from .client import TceCrimeaClient
+from .client import TceCrimeaAuthError, TceCrimeaClient
 
-__all__ = ["TceCrimeaClient"]
+__all__ = ["TceCrimeaAuthError", "TceCrimeaClient"]
