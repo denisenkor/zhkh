@@ -86,7 +86,13 @@ class TceCrimeaClient:
                 if key == "Location"
                 else response.headers.get(key)
             )
-            for key in ("Content-Type", "Content-Length", "Location", "Server", "Via")
+            for key in (
+                "Content-Type",
+                "Content-Length",
+                "Location",
+                "Server",
+                "Via",
+            )
             if response.headers.get(key) is not None
         }
 
@@ -116,7 +122,10 @@ class TceCrimeaClient:
 
         # Redact JWTs and common token/credential values that may be echoed by the site.
         text_preview = re.sub(
-            r"(?i)\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b",
+            (
+                r"(?i)\beyJ[A-Za-z0-9_-]{10,}\."
+                r"[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b"
+            ),
             "<token-redacted>",
             text_preview,
         )
@@ -307,7 +316,9 @@ class TceCrimeaClient:
                     _LOGGER.warning(
                         "TCE authentication failed: session could not be restored"
                     )
-                    raise TceCrimeaAuthError("Provider session could not be restored")
+                    raise TceCrimeaAuthError(
+                        "Provider session could not be restored"
+                    )
 
             return self._parse_balance(html)
         except (aiohttp.ClientError, TimeoutError) as err:
@@ -326,7 +337,10 @@ class TceCrimeaClient:
 
         for title in block.select("div.title"):
             label = " ".join(title.get_text(" ", strip=True).lower().split())
-            if "состояние расчетов" not in label and "состояние расчётов" not in label:
+            if (
+                "состояние расчетов" not in label
+                and "состояние расчётов" not in label
+            ):
                 continue
 
             value = title.find_next_sibling("div", class_="value")
@@ -350,7 +364,11 @@ class TceCrimeaClient:
                 return Decimal("0")
 
             match = re.search(
-                r"(долг|задолженность|переплата)\s*([-+]?\d[\d\s]*(?:[,.]\d+)?)\s*(?:руб(?:\.|лей|ля)?|₽)",
+                (
+                    r"(долг|задолженность|переплата)\s*"
+                    r"([-+]?\d[\d\s]*(?:[,.]\d+)?)\s*"
+                    r"(?:руб(?:\.|лей|ля)?|₽)"
+                ),
                 status,
             )
             if match is None:
