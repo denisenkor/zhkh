@@ -108,10 +108,19 @@ class ZhkhCoordinator(DataUpdateCoordinator):
         days_in_month = calendar.monthrange(now.year, now.month)[1]
         scheduled_day = min(self.update_day, days_in_month)
 
-        if now.day < scheduled_day:
-            return
+        if now.day >= scheduled_day:
+            period_date = now
+        else:
+            # If HA was offline across the month boundary, catch up the
+            # previous month's missed run after the next startup.
+            year = now.year
+            month = now.month - 1
+            if month == 0:
+                year -= 1
+                month = 12
+            period_date = now.replace(year=year, month=month, day=1)
 
-        period = now.strftime("%Y-%m")
+        period = period_date.strftime("%Y-%m")
         if self._last_scheduled_period == period:
             return
 
