@@ -35,7 +35,9 @@ async def async_setup_entry(
     if coordinator.provider == PROVIDER_CRIMEAGASNET:
         entities = []
         for account in (coordinator.data or {}).get("accounts", []):
-            entities.extend(CrimeaGasnetAccountSensors(coordinator, entry, account).entities)
+            entities.extend(
+                CrimeaGasnetAccountSensors(coordinator, entry, account).entities
+            )
         async_add_entities(entities)
         return
 
