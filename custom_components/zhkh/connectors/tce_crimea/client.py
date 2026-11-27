@@ -7,6 +7,7 @@ from decimal import Decimal, InvalidOperation
 from urllib.parse import urljoin
 
 import aiohttp
+from yarl import URL
 from bs4 import BeautifulSoup
 from homeassistant.exceptions import HomeAssistantError
 
@@ -54,8 +55,6 @@ class TceCrimeaClient:
 
     def _ensure_browser_cookies(self) -> None:
         """Reproduce cookies set by the browser-side Drupal bootstrap."""
-        from yarl import URL
-
         current = self._session.cookie_jar.filter_cookies(URL(LOGIN_URL))
         missing = {}
         if "has_js" not in current:
