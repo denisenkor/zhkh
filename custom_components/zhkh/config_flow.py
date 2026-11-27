@@ -130,7 +130,7 @@ class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             if not errors:
                 return self.async_create_entry(
-                    title=f"{PROVIDER_CRIMEA_ENERGY_NAME} ({email})",
+                    title=PROVIDER_CRIMEA_ENERGY_NAME,
                     data={
                         CONF_PROVIDER: PROVIDER_CRIMEA_ENERGY,
                         "email": email,
