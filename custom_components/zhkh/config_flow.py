@@ -20,6 +20,8 @@ from .const import (
     PROVIDER_CRIMEA_ENERGY_NAME,
     PROVIDER_CRIMEAGASNET,
     PROVIDER_CRIMEAGASNET_NAME,
+    PROVIDER_CRIMEA_ECOR,
+    PROVIDER_CRIMEA_ECOR_NAME,
     PROVIDER_TCE,
     PROVIDER_TCE_NAME,
 )
@@ -31,6 +33,7 @@ from .connectors.crimeagasnet import (
     CrimeaGasnetAuthError,
     CrimeaGasnetClient,
 )
+from .connectors.crimea_ecor import CrimeaEcorAuthError, CrimeaEcorClient
 from .connectors.tce_crimea import TceCrimeaAuthError, TceCrimeaClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -49,6 +52,7 @@ class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "tce_crimea": PROVIDER_TCE_NAME,
                 "crimea_energy": PROVIDER_CRIMEA_ENERGY_NAME,
                 "crimeagasnet": PROVIDER_CRIMEAGASNET_NAME,
+                "crimea_ecor": PROVIDER_CRIMEA_ECOR_NAME,
             },
         )
 
@@ -213,6 +217,59 @@ class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
         return self.async_show_form(
             step_id="crimeagasnet",
+            data_schema=schema,
+            errors=errors,
+        )
+
+
+    async def async_step_crimea_ecor(self, user_input=None):
+        """Configure a Крымэкоресурсы account."""
+        errors = {}
+        if user_input is not None:
+            account = user_input["crimea_ecor_account"].strip()
+            account_key = hashlib.sha256(account.encode("utf-8")).hexdigest()[:20]
+            await self.async_set_unique_id(f"{PROVIDER_CRIMEA_ECOR}_{account_key}")
+            self._abort_if_unique_id_configured()
+
+            client = CrimeaEcorClient(account, user_input["crimea_ecor_password"])
+            try:
+                await client.async_get_data()
+            except CrimeaEcorAuthError:
+                errors["base"] = "invalid_auth"
+            except HomeAssistantError as err:
+                _LOGGER.warning(
+                    "Crimea Ecor validation failed (%s): %s",
+                    type(err).__name__,
+                    str(err),
+                )
+                errors["base"] = "cannot_connect"
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.error(
+                    "Unexpected Crimea Ecor validation error (%s)",
+                    type(err).__name__,
+                )
+                errors["base"] = "cannot_connect"
+            finally:
+                await client.async_close()
+
+            if not errors:
+                return self.async_create_entry(
+                    title=f"{PROVIDER_CRIMEA_ECOR_NAME} ({account})",
+                    data={
+                        CONF_PROVIDER: PROVIDER_CRIMEA_ECOR,
+                        CONF_ACCOUNT: account,
+                        CONF_PASSWORD: user_input["crimea_ecor_password"],
+                    },
+                )
+
+        schema = vol.Schema(
+            {
+                vol.Required("crimea_ecor_account"): str,
+                vol.Required("crimea_ecor_password"): str,
+            }
+        )
+        return self.async_show_form(
+            step_id="crimea_ecor",
             data_schema=schema,
             errors=errors,
         )
