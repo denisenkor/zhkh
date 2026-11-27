@@ -94,14 +94,11 @@ class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     def async_get_options_flow(config_entry):
         """Return the options flow."""
-        return ZhkhOptionsFlow(config_entry)
+        return ZhkhOptionsFlow()
 
 
-class ZhkhOptionsFlow(config_entries.OptionsFlow):
+class ZhkhOptionsFlow(config_entries.OptionsFlowWithReload):
     """Configure the monthly update day."""
-
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        self.config_entry = config_entry
 
     async def async_step_init(self, user_input=None):
         """Manage integration options."""
