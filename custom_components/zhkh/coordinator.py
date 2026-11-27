@@ -86,7 +86,7 @@ class ZhkhCoordinator(DataUpdateCoordinator):
             "last_updated": self._last_updated,
         }
 
-    def async_start_schedule(self) -> None:
+    async def async_start_schedule(self) -> None:
         """Start the daily scheduler and catch up after a missed schedule."""
         self._unsub_time_change = async_track_time_change(
             self.hass,
@@ -95,7 +95,7 @@ class ZhkhCoordinator(DataUpdateCoordinator):
             minute=0,
             second=0,
         )
-        self.hass.async_create_task(self._async_check_schedule(startup=True))
+        await self._async_check_schedule(startup=True)
 
     @callback
     def _handle_time_change(self, now: datetime) -> None:
@@ -133,14 +133,13 @@ class ZhkhCoordinator(DataUpdateCoordinator):
                 _LOGGER.warning("Не удалось сохранить расписание обновления ЖКХ")
             return
 
-        # Save before requesting data to prevent duplicate attempts after restart.
-        self._last_scheduled_period = period
-        try:
-            await self._async_save_metadata()
-        except Exception:  # noqa: BLE001
-            _LOGGER.warning("Не удалось сохранить расписание обновления ЖКХ")
-
         await self.async_refresh()
+        if self.last_update_success:
+            self._last_scheduled_period = period
+            try:
+                await self._async_save_metadata()
+            except Exception:  # noqa: BLE001
+                _LOGGER.warning("Не удалось сохранить расписание обновления ЖКХ")
 
     async def async_close(self) -> None:
         """Stop scheduled callbacks and close the provider session."""
