@@ -47,6 +47,7 @@ class CrimeaGasnetClient:
             headers=_BROWSER_HEADERS,
         )
         self._logged_in = False
+        self._accounts_html: str | None = None
 
     async def _request(self, method: str, *, data=None, stage: str) -> str:
         """Perform an HTML request without exposing credentials or response data."""
@@ -94,6 +95,7 @@ class CrimeaGasnetClient:
             raise HomeAssistantError(
                 "После авторизации не найдена таблица лицевых счетов"
             )
+        self._accounts_html = html
         self._logged_in = True
 
     @staticmethod
@@ -165,20 +167,18 @@ class CrimeaGasnetClient:
         """Return all personal accounts from the authenticated session."""
         if not self._logged_in:
             await self.async_login()
-
-        html = await self._request("GET", stage="получение лицевых счетов")
-        soup = BeautifulSoup(html, "html.parser")
-        if self._is_login_page(soup):
-            self._logged_in = False
-            await self.async_login()
-            html = await self._request(
-                "GET", stage="повторное получение лицевых счетов"
-            )
+            html = self._accounts_html or ""
+        else:
+            html = await self._request("GET", stage="получение лицевых счетов")
             soup = BeautifulSoup(html, "html.parser")
-            if self._is_login_page(soup):
-                raise CrimeaGasnetAuthError(
-                    "Не удалось восстановить сессию Крымгазсети"
-                )
+            if (
+                self._is_login_page(soup)
+                or soup.select_one("table.table.table-hover.table-bordered") is None
+            ):
+                self._logged_in = False
+                await self.async_login()
+                html = self._accounts_html or ""
+
         return self._parse_accounts(html)
 
     async def async_close(self) -> None:
