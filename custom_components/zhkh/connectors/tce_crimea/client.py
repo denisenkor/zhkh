@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import re
 from decimal import Decimal, InvalidOperation
 from urllib.parse import urljoin
@@ -10,8 +9,6 @@ from urllib.parse import urljoin
 import aiohttp
 from bs4 import BeautifulSoup
 from homeassistant.exceptions import HomeAssistantError
-
-_LOGGER = logging.getLogger(__name__)
 
 BASE_URL = "https://lk.tce.crimea.ru"
 LOGIN_URL = f"{BASE_URL}/cabinet/"
@@ -101,9 +98,6 @@ class TceCrimeaClient:
                     break
 
             if form is None:
-                _LOGGER.error(
-                    "Крымтеплокоммунэнерго: на странице входа не найдена форма авторизации."
-                )
                 raise HomeAssistantError("Форма авторизации поставщика не найдена")
 
             payload = {
@@ -139,10 +133,6 @@ class TceCrimeaClient:
                 response.raise_for_status()
 
             if self._is_login_page(post_html):
-                _LOGGER.warning(
-                    "Крымтеплокоммунэнерго: сайт отклонил авторизацию. "
-                    "Проверьте номер лицевого счёта и пароль."
-                )
                 raise TceCrimeaAuthError("Поставщик отклонил авторизацию")
 
             stage = "проверка личного кабинета"
@@ -154,16 +144,9 @@ class TceCrimeaClient:
                 "/services" not in final_url
                 or page.select_one("form#user-login-form") is not None
             ):
-                _LOGGER.warning(
-                    "Крымтеплокоммунэнерго: после входа сайт вернул страницу авторизации."
-                )
                 raise TceCrimeaAuthError("Не удалось войти в личный кабинет")
 
             if page.select_one(".info_column_primary") is None:
-                _LOGGER.error(
-                    "Крымтеплокоммунэнерго: страница кабинета загружена, "
-                    "но блок данных абонента не найден."
-                )
                 raise HomeAssistantError("Данные абонента на странице не найдены")
 
             self._logged_in = True
@@ -175,11 +158,6 @@ class TceCrimeaClient:
                 f"HTTP {err.status}"
                 if isinstance(err, aiohttp.ClientResponseError)
                 else type(err).__name__
-            )
-            _LOGGER.error(
-                "Крымтеплокоммунэнерго: ошибка соединения (%s) на этапе «%s».",
-                status,
-                stage,
             )
             raise HomeAssistantError(
                 f"Ошибка соединения при {stage} ({status})"
@@ -218,10 +196,6 @@ class TceCrimeaClient:
                 f"HTTP {err.status}"
                 if isinstance(err, aiohttp.ClientResponseError)
                 else type(err).__name__
-            )
-            _LOGGER.error(
-                "Крымтеплокоммунэнерго: не удалось загрузить данные личного кабинета (%s).",
-                status,
             )
             raise HomeAssistantError(
                 f"Не удалось загрузить данные личного кабинета ({status})"
