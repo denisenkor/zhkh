@@ -6,7 +6,8 @@
         "description": "Выберите поставщика коммунальных услуг.",
         "menu_options": {
           "tce_crimea": "ГУП РК «Крымтеплокоммунэнерго»",
-          "crimea_energy": "Крымэнерго (crimea-energy.ru)"
+          "crimea_energy": "Крымэнерго (crimea-energy.ru)",
+          "crimeagasnet": "Крымгазсети (crimeagasnet.ru)"
         }
       },
       "tce_crimea": {
@@ -23,6 +24,14 @@
         "data": {
           "crimea_energy_email": "Адрес электронной почты",
           "crimea_energy_password": "Пароль"
+        }
+      },
+      "crimeagasnet": {
+        "title": "Подключение Крымгазсети",
+        "description": "Введите адрес электронной почты и пароль от личного кабинета Крымгазсети.",
+        "data": {
+          "crimeagasnet_mail": "Адрес электронной почты",
+          "crimeagasnet_password": "Пароль"
         }
       }
     },
