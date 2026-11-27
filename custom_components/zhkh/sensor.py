@@ -22,6 +22,7 @@ async def async_setup_entry(
         [
             ProviderSensor(coordinator, entry),
             BalanceSensor(coordinator, entry),
+            LastUpdateSensor(coordinator, entry),
         ]
     )
 
@@ -46,7 +47,6 @@ class ProviderSensor(ZhkhBaseSensor):
         super().__init__(coordinator, entry, "provider")
         self._attr_name = "Поставщик"
         self._attr_icon = "mdi:domain"
-        self._attr_native_value = PROVIDER_TCE_NAME
 
     @property
     def native_value(self):
@@ -66,3 +66,19 @@ class BalanceSensor(ZhkhBaseSensor):
     @property
     def native_value(self):
         return self.coordinator.data.get("balance") if self.coordinator.data else None
+
+
+class LastUpdateSensor(ZhkhBaseSensor):
+    """Timestamp of the last successful data update."""
+
+    def __init__(self, coordinator, entry) -> None:
+        super().__init__(coordinator, entry, "last_update")
+        self._attr_name = "Последнее обновление"
+        self._attr_device_class = SensorDeviceClass.TIMESTAMP
+        self._attr_icon = "mdi:clock-check-outline"
+
+    @property
+    def native_value(self):
+        if self.coordinator.data:
+            return self.coordinator.data.get("last_updated")
+        return self.coordinator._last_updated
