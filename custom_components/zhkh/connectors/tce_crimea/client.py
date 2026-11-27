@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import re
 from decimal import Decimal, InvalidOperation
-from http.cookies import SimpleCookie
+from http.cookies import CookieError, SimpleCookie
 from urllib.parse import urljoin
 
 import aiohttp
@@ -59,7 +59,7 @@ class TceCrimeaClient:
         parsed = SimpleCookie()
         try:
             parsed.load(cookie_header)
-        except (TypeError, ValueError):
+        except (CookieError, TypeError, ValueError):
             return ["<unparsed-cookie-header>"]
         return sorted(parsed.keys())
 
@@ -226,6 +226,11 @@ class TceCrimeaClient:
                 response.raise_for_status()
 
             if self._is_login_page(post_html):
+                _LOGGER.warning(
+                    "TCE authentication rejected: POST returned the login form "
+                    "(HTTP %s)",
+                    response.status,
+                )
                 raise TceCrimeaAuthError("Provider rejected the login form")
 
             stage = "GET services page after login"
@@ -237,6 +242,10 @@ class TceCrimeaClient:
                 "/services" not in final_url
                 or check.select_one("form#user-login-form") is not None
             ):
+                _LOGGER.warning(
+                    "TCE authentication rejected: services page redirected "
+                    "to login or returned a login form"
+                )
                 raise TceCrimeaAuthError("Provider login was rejected")
             if check.select_one(".info_column_primary") is None:
                 raise HomeAssistantError("Subscriber information block was not found")
@@ -279,6 +288,9 @@ class TceCrimeaClient:
                     "/services" not in final_url
                     or page.select_one("form#user-login-form") is not None
                 ):
+                    _LOGGER.warning(
+                        "TCE authentication failed: session could not be restored"
+                    )
                     raise TceCrimeaAuthError("Provider session could not be restored")
 
             return self._parse_balance(html)
