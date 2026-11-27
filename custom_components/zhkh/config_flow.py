@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
+import logging
+
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 
@@ -16,7 +18,9 @@ from .const import (
     PROVIDER_TCE,
     PROVIDER_TCE_NAME,
 )
-from .connectors.tce_crimea import TceCrimeaClient
+from .connectors.tce_crimea import TceCrimeaAuthError, TceCrimeaClient
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -36,14 +40,26 @@ class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
         if user_input is not None:
             account = user_input[CONF_ACCOUNT].strip()
-            await self.async_set_unique_id(f"{PROVIDER_TCE}_{account}")
+            account_key = hashlib.sha256(account.encode("utf-8")).hexdigest()[:20]
+            await self.async_set_unique_id(f"{PROVIDER_TCE}_{account_key}")
             self._abort_if_unique_id_configured()
 
             client = TceCrimeaClient(account, user_input[CONF_PASSWORD])
             try:
                 await client.async_login()
                 await client.async_get_balance()
-            except (HomeAssistantError, Exception):
+            except TceCrimeaAuthError:
+                errors["base"] = "invalid_auth"
+            except HomeAssistantError as err:
+                _LOGGER.warning(
+                    "Provider validation failed (%s)", type(err).__name__
+                )
+                errors["base"] = "cannot_connect"
+            except Exception as err:  # noqa: BLE001
+                # Never log exception text: request details may contain credentials.
+                _LOGGER.error(
+                    "Unexpected provider validation error (%s)", type(err).__name__
+                )
                 errors["base"] = "cannot_connect"
             finally:
                 await client.async_close()
