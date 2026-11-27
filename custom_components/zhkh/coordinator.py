@@ -24,6 +24,7 @@ from .connectors.crimeagasnet import (
     CrimeaGasnetClient,
     CrimeaGasnetConnectionError,
 )
+from .connectors.crimea_ecor import CrimeaEcorClient, CrimeaEcorConnectionError
 from .connectors.tce_crimea import TceCrimeaClient, TceCrimeaConnectionError
 from .const import (
     CONF_ACCOUNT,
@@ -34,6 +35,7 @@ from .const import (
     DOMAIN,
     PROVIDER_CRIMEA_ENERGY,
     PROVIDER_CRIMEAGASNET,
+    PROVIDER_CRIMEA_ECOR,
     UPDATE_HOUR,
 )
 
@@ -62,6 +64,10 @@ class ZhkhCoordinator(DataUpdateCoordinator):
         elif self.provider == PROVIDER_CRIMEAGASNET:
             self.client = CrimeaGasnetClient(
                 entry.data["crimeagasnet_email"], entry.data[CONF_PASSWORD]
+            )
+        elif self.provider == PROVIDER_CRIMEA_ECOR:
+            self.client = CrimeaEcorClient(
+                entry.data[CONF_ACCOUNT], entry.data[CONF_PASSWORD]
             )
         else:
             self.client = TceCrimeaClient(
@@ -96,6 +102,13 @@ class ZhkhCoordinator(DataUpdateCoordinator):
                 except (KeyError, InvalidOperation, TypeError, ValueError):
                     continue
             self.data = {"bills": bills, "last_updated": self._last_updated}
+        elif self.provider == PROVIDER_CRIMEA_ECOR:
+            balance = stored.get("balance")
+            self.data = {
+                "provider": stored.get("provider"),
+                "balance": Decimal(str(balance)) if balance is not None else None,
+                "last_updated": self._last_updated,
+            }
         elif self.provider == PROVIDER_CRIMEAGASNET:
             accounts = []
             for account in stored.get("accounts", []):
@@ -127,6 +140,10 @@ class ZhkhCoordinator(DataUpdateCoordinator):
                 }
                 for bill in result.get("bills", [])
             ]
+        elif self.provider == PROVIDER_CRIMEA_ECOR:
+            balance = result.get("balance")
+            stored["provider"] = result.get("provider")
+            stored["balance"] = str(balance) if balance is not None else None
         elif self.provider == PROVIDER_CRIMEAGASNET:
             stored["accounts"] = [
                 {
@@ -150,6 +167,7 @@ class ZhkhCoordinator(DataUpdateCoordinator):
             TceCrimeaConnectionError,
             CrimeaEnergyConnectionError,
             CrimeaGasnetConnectionError,
+            CrimeaEcorConnectionError,
         )
         for attempt in range(1, _UPDATE_ATTEMPTS + 1):
             try:
@@ -159,6 +177,8 @@ class ZhkhCoordinator(DataUpdateCoordinator):
                 elif self.provider == PROVIDER_CRIMEAGASNET:
                     accounts = await self.client.async_get_accounts()
                     result = {"accounts": accounts}
+                elif self.provider == PROVIDER_CRIMEA_ECOR:
+                    result = await self.client.async_get_data()
                 else:
                     balance = await self.client.async_get_balance()
                     result = {"balance": balance}
