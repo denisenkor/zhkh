@@ -10,6 +10,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.storage import Store
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -70,9 +71,14 @@ class ZhkhCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self):
         try:
             balance = await self.client.async_get_balance()
-        except Exception as err:
+        except HomeAssistantError as err:
             raise UpdateFailed(
                 f"Не удалось получить задолженность: {err}"
+            ) from err
+        except Exception as err:  # noqa: BLE001
+            raise UpdateFailed(
+                "Не удалось получить задолженность "
+                f"из-за внутренней ошибки ({type(err).__name__})."
             ) from err
 
         self._last_updated = dt_util.now()
