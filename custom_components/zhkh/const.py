@@ -12,5 +12,8 @@ PROVIDER_TCE_NAME = 'ГУП РК «Крымтеплокоммунэнерго»'
 PROVIDER_CRIMEA_ENERGY = "crimea_energy"
 PROVIDER_CRIMEA_ENERGY_NAME = "Крымэнерго"
 
+PROVIDER_CRIMEAGASNET = "crimeagasnet"
+PROVIDER_CRIMEAGASNET_NAME = "Крымгазсети"
+
 DEFAULT_UPDATE_DAY = 1
 UPDATE_HOUR = 6
