@@ -18,12 +18,18 @@ from .const import (
     DOMAIN,
     PROVIDER_CRIMEA_ENERGY,
     PROVIDER_CRIMEA_ENERGY_NAME,
+    PROVIDER_CRIMEAGASNET,
+    PROVIDER_CRIMEAGASNET_NAME,
     PROVIDER_TCE,
     PROVIDER_TCE_NAME,
 )
 from .connectors.crimea_energy import (
     CrimeaEnergyAuthError,
     CrimeaEnergyClient,
+)
+from .connectors.crimeagasnet import (
+    CrimeaGasnetAuthError,
+    CrimeaGasnetClient,
 )
 from .connectors.tce_crimea import TceCrimeaAuthError, TceCrimeaClient
 
@@ -42,6 +48,7 @@ class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             menu_options={
                 "tce_crimea": PROVIDER_TCE_NAME,
                 "crimea_energy": PROVIDER_CRIMEA_ENERGY_NAME,
+                "crimeagasnet": PROVIDER_CRIMEAGASNET_NAME,
             },
         )
 
@@ -150,6 +157,63 @@ class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="crimea_energy",
             data_schema=schema,
+        )
+
+
+    async def async_step_crimeagasnet(self, user_input=None):
+        """Configure a Крымгазсети account."""
+        errors = {}
+        if user_input is not None:
+            email = user_input["crimeagasnet_mail"].strip()
+            email_key = hashlib.sha256(email.lower().encode("utf-8")).hexdigest()[:20]
+            await self.async_set_unique_id(
+                f"{PROVIDER_CRIMEAGASNET}_{email_key}"
+            )
+            self._abort_if_unique_id_configured()
+
+            client = CrimeaGasnetClient(
+                email, user_input["crimeagasnet_password"]
+            )
+            try:
+                await client.async_get_accounts()
+            except CrimeaGasnetAuthError:
+                errors["base"] = "invalid_auth"
+            except HomeAssistantError as err:
+                _LOGGER.warning(
+                    "Crimea Gasnet validation failed (%s): %s",
+                    type(err).__name__,
+                    str(err),
+                )
+                errors["base"] = "cannot_connect"
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.error(
+                    "Unexpected Crimea Gasnet validation error (%s)",
+                    type(err).__name__,
+                )
+                errors["base"] = "cannot_connect"
+            finally:
+                await client.async_close()
+
+            if not errors:
+                return self.async_create_entry(
+                    title=PROVIDER_CRIMEAGASNET_NAME,
+                    data={
+                        CONF_PROVIDER: PROVIDER_CRIMEAGASNET,
+                        "crimeagasnet_email": email,
+                        CONF_PASSWORD: user_input["crimeagasnet_password"],
+                    },
+                )
+
+        schema = vol.Schema(
+            {
+                vol.Required("crimeagasnet_mail"): str,
+                vol.Required("crimeagasnet_password"): str,
+            }
+        )
+        return self.async_show_form(
+            step_id="crimeagasnet",
+            data_schema=schema,
+            errors=errors,
         )
 
     @staticmethod
