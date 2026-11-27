@@ -36,6 +36,14 @@
           "crimea_ecor_account": "Номер лицевого счёта",
           "crimea_ecor_password": "Пароль"
         }
+      },
+      "eisgkh": {
+        "title": "Подключение ЕИС ЖКХ",
+        "description": "Введите номер лицевого счёта и пароль от личного кабинета ЕИС ЖКХ.",
+        "data": {
+          "eisgkh_account": "Номер лицевого счёта",
+          "eisgkh_password": "Пароль"
+        }
       }
     },
     "options": {
