@@ -157,6 +157,7 @@ class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="crimea_energy",
             data_schema=schema,
+            errors=errors,
         )
 
 
