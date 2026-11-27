@@ -28,7 +28,8 @@ async def async_setup_entry(
 
         device_registry = dr.async_get(hass)
         legacy_device = device_registry.async_get_device(
-            identifiers={(DOMAIN, entry.entry_id)}
+            identifiers={(DOMAIN, entry.entry_id)},
+            connections=set(),
         )
         if legacy_device:
             device_registry.async_remove_device(legacy_device.id)
