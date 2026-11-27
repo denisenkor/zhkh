@@ -43,7 +43,7 @@ class TceCrimeaClient:
     def _log_response(self, stage: str, response: aiohttp.ClientResponse, body: str) -> None:
         """Log useful response diagnostics without exposing credentials or private data."""
         safe_headers = {
-            key: response.headers.get(key)
+            key: ("<present; value redacted>" if key == "Location" else response.headers.get(key))
             for key in ("Content-Type", "Content-Length", "Location", "Server", "Via")
             if response.headers.get(key) is not None
         }
@@ -69,14 +69,19 @@ class TceCrimeaClient:
             text_preview = text_preview.replace(self._account, "<account-redacted>")
         if self._password:
             text_preview = text_preview.replace(self._password, "<password-redacted>")
+        text_preview = re.sub(
+            r"(?i)\\beyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\b",
+            "<token-redacted>",
+            text_preview,
+        )
 
         _LOGGER.debug(
             "TCE %s response: status=%s url=%s final_url=%s headers=%s "
             "cookies=%s cookie_jar_names=%s body_length=%s body_preview=%r",
             stage,
             response.status,
-            response.request_info.real_url,
-            response.url,
+            response.request_info.real_url.with_query(None),
+            response.url.with_query(None),
             safe_headers,
             cookies,
             sorted(self._session.cookie_jar.filter_cookies(response.url).keys()),
