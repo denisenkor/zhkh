@@ -70,7 +70,7 @@ class TceCrimeaClient:
         if self._password:
             text_preview = text_preview.replace(self._password, "<password-redacted>")
         text_preview = re.sub(
-            r"(?i)\\beyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\b",
+            r"(?i)\beyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\b",
             "<token-redacted>",
             text_preview,
         )
