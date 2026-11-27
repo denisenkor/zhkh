@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import calendar
 import logging
 from datetime import datetime
@@ -15,7 +16,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .connectors.tce_crimea import TceCrimeaClient
+from .connectors.tce_crimea import TceCrimeaClient, TceCrimeaConnectionError
 from .const import (
     CONF_ACCOUNT,
     CONF_PASSWORD,
@@ -26,6 +27,9 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+_UPDATE_ATTEMPTS = 3
+_RETRY_DELAY = 10
 
 
 class ZhkhCoordinator(DataUpdateCoordinator):
@@ -82,17 +86,34 @@ class ZhkhCoordinator(DataUpdateCoordinator):
         )
 
     async def _async_update_data(self):
-        try:
-            balance = await self.client.async_get_balance()
-        except HomeAssistantError as err:
-            raise UpdateFailed(
-                f"Не удалось получить задолженность: {err}"
-            ) from err
-        except Exception as err:  # noqa: BLE001
-            raise UpdateFailed(
-                "Не удалось получить задолженность "
-                f"из-за внутренней ошибки ({type(err).__name__})."
-            ) from err
+        for attempt in range(1, _UPDATE_ATTEMPTS + 1):
+            try:
+                balance = await self.client.async_get_balance()
+                break
+            except TceCrimeaConnectionError as err:
+                if attempt >= _UPDATE_ATTEMPTS:
+                    raise UpdateFailed(
+                        f"Не удалось получить задолженность после {_UPDATE_ATTEMPTS} попыток: {err}"
+                    ) from err
+
+                _LOGGER.warning(
+                    "Ошибка соединения при получении задолженности "
+                    "(попытка %s из %s). Повтор через %s секунд: %s",
+                    attempt,
+                    _UPDATE_ATTEMPTS,
+                    _RETRY_DELAY,
+                    err,
+                )
+                await asyncio.sleep(_RETRY_DELAY)
+            except HomeAssistantError as err:
+                raise UpdateFailed(
+                    f"Не удалось получить задолженность: {err}"
+                ) from err
+            except Exception as err:  # noqa: BLE001
+                raise UpdateFailed(
+                    "Не удалось получить задолженность "
+                    f"из-за внутренней ошибки ({type(err).__name__})."
+                ) from err
 
         self._last_updated = dt_util.now()
         result = {
