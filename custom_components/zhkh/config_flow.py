@@ -279,7 +279,7 @@ class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_eisgkh(self, user_input=None):
-        """Configure an ЕИС ЖКХ personal account."""
+        """Configure a НО «РФ КРМД РК» personal account."""
         errors = {}
         if user_input is not None:
             account = user_input["eisgkh_account"].strip()
@@ -294,14 +294,14 @@ class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_auth"
             except HomeAssistantError as err:
                 _LOGGER.warning(
-                    "EIS ЖКХ validation failed (%s): %s",
+                    "НО «РФ КРМД РК» validation failed (%s): %s",
                     type(err).__name__,
                     str(err),
                 )
                 errors["base"] = "cannot_connect"
             except Exception as err:  # noqa: BLE001
                 _LOGGER.error(
-                    "Unexpected ЕИС ЖКХ validation error (%s)",
+                    "Unexpected НО «РФ КРМД РК» validation error (%s)",
                     type(err).__name__,
                 )
                 errors["base"] = "cannot_connect"
