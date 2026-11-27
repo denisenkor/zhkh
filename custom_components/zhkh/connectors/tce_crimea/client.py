@@ -40,6 +40,7 @@ class TceCrimeaClient:
     async def async_login(self) -> None:
         """Fetch Drupal login form, submit it, then verify the session."""
         stage = "GET login page"
+        request_url = LOGIN_URL
         try:
             async with self._session.get(LOGIN_URL) as response:
                 response.raise_for_status()
@@ -66,6 +67,7 @@ class TceCrimeaClient:
             action = form.get("action") or "/cabinet?destination=cabinet"
             post_url = urljoin(BASE_URL, action)
             stage = "POST login form"
+            request_url = post_url
             async with self._session.post(
                 post_url,
                 data=payload,
@@ -79,6 +81,7 @@ class TceCrimeaClient:
             # Always verify authentication by requesting the page the user sees
             # after login. A successful POST status alone does not prove login.
             stage = "GET services page after login"
+            request_url = SERVICES_URL
             async with self._session.get(
                 SERVICES_URL, headers={"Referer": LOGIN_URL}
             ) as response:
@@ -100,7 +103,9 @@ class TceCrimeaClient:
             raise
         except (aiohttp.ClientError, TimeoutError) as err:
             detail = f"HTTP {err.status}" if isinstance(err, aiohttp.ClientResponseError) else type(err).__name__
-            raise HomeAssistantError(f"Connection failed during {stage} ({detail})") from err
+            raise HomeAssistantError(
+                f"Connection failed during {stage} ({detail}), URL: {request_url}"
+            ) from err
 
     async def async_get_balance(self) -> Decimal:
         """Get balance from the authenticated services page."""
@@ -125,7 +130,10 @@ class TceCrimeaClient:
 
             return self._parse_balance(html)
         except (aiohttp.ClientError, TimeoutError) as err:
-            raise HomeAssistantError("Could not load provider services page") from err
+            raise HomeAssistantError(
+                f"Could not load provider services page ({type(err).__name__}), "
+                f"URL: {SERVICES_URL}"
+            ) from err
 
     @staticmethod
     def _parse_balance(html: str) -> Decimal:
