@@ -9,5 +9,8 @@ CONF_UPDATE_DAY = "update_day"
 PROVIDER_TCE = "tce_crimea"
 PROVIDER_TCE_NAME = 'ГУП РК «Крымтеплокоммунэнерго»'
 
+PROVIDER_CRIMEA_ENERGY = "crimea_energy"
+PROVIDER_CRIMEA_ENERGY_NAME = "Крымэнерго"
+
 DEFAULT_UPDATE_DAY = 1
 UPDATE_HOUR = 6
