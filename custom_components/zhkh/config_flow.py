@@ -39,7 +39,10 @@ class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Select provider."""
         return self.async_show_menu(
             step_id="user",
-            menu_options=["tce_crimea", "crimea_energy"],
+            menu_options={
+                "tce_crimea": PROVIDER_TCE_NAME,
+                "crimea_energy": PROVIDER_CRIMEA_ENERGY_NAME,
+            },
         )
 
     async def async_step_tce_crimea(self, user_input=None):
