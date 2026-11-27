@@ -79,7 +79,6 @@ class TceCrimeaClient:
     async def async_login(self) -> None:
         """Fetch the Drupal login form, submit it, and verify the session."""
         stage = "загрузка страницы входа"
-        request_url = LOGIN_URL
         try:
             async with self._session.get(LOGIN_URL) as response:
                 login_html = await response.text()
@@ -114,10 +113,10 @@ class TceCrimeaClient:
             payload.setdefault("form_id", "user_login_central_block")
 
             action = form.get("action") or "/cabinet?destination=cabinet"
-            request_url = urljoin(BASE_URL, action)
+            post_url = urljoin(BASE_URL, action)
             stage = "отправка формы авторизации"
             async with self._session.post(
-                request_url,
+                post_url,
                 data=payload,
                 allow_redirects=True,
                 headers={
@@ -136,7 +135,6 @@ class TceCrimeaClient:
                 raise TceCrimeaAuthError("Поставщик отклонил авторизацию")
 
             stage = "проверка личного кабинета"
-            request_url = SERVICES_URL
             html, final_url = await self._async_get_services_html()
             page = BeautifulSoup(html, "html.parser")
 
