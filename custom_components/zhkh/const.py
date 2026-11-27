@@ -1,4 +1,4 @@
-"""Constants for the ЖКХ integration."""
+"""Constants for the ЖКХ Крым integration."""
 
 DOMAIN = "zhkh"
 CONF_PROVIDER = "provider"
