@@ -3,6 +3,8 @@
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import DeviceInfo
 
 from .const import DOMAIN, PROVIDER_CRIMEA_ENERGY
@@ -16,6 +18,21 @@ async def async_setup_entry(
     coordinator: ZhkhCoordinator = hass.data[DOMAIN][entry.entry_id]
 
     if coordinator.provider == PROVIDER_CRIMEA_ENERGY:
+        # Remove the legacy account-wide button and its now-obsolete device.
+        entity_registry = er.async_get(hass)
+        legacy_entity_id = entity_registry.async_get_entity_id(
+            "button", DOMAIN, f"{entry.entry_id}_refresh"
+        )
+        if legacy_entity_id:
+            entity_registry.async_remove(legacy_entity_id)
+
+        device_registry = dr.async_get(hass)
+        legacy_device = device_registry.async_get_device(
+            identifiers={(DOMAIN, entry.entry_id)}
+        )
+        if legacy_device:
+            device_registry.async_remove_device(legacy_device.id)
+
         entities = []
         for bill in (coordinator.data or {}).get("bills", []):
             account_id = str(bill["id"])
