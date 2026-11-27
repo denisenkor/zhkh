@@ -17,6 +17,8 @@ from .const import (
     PROVIDER_CRIMEAGASNET_NAME,
     PROVIDER_CRIMEA_ECOR,
     PROVIDER_CRIMEA_ECOR_NAME,
+    PROVIDER_EISGKH,
+    PROVIDER_EISGKH_NAME,
     PROVIDER_TCE_NAME,
 )
 from .coordinator import ZhkhCoordinator
@@ -37,6 +39,12 @@ async def async_setup_entry(
     if coordinator.provider == PROVIDER_CRIMEA_ECOR:
         async_add_entities(
             [CrimeaEcorProviderSensor(coordinator, entry), CrimeaEcorDebtSensor(coordinator, entry)]
+        )
+        return
+
+    if coordinator.provider == PROVIDER_EISGKH:
+        async_add_entities(
+            [EisgkhProviderSensor(coordinator, entry), EisgkhDebtSensor(coordinator, entry)]
         )
         return
 
@@ -146,6 +154,49 @@ class CrimeaEcorProviderSensor(CrimeaEcorBaseSensor):
 
 class CrimeaEcorDebtSensor(CrimeaEcorBaseSensor):
     """Debt amount parsed from the tariff cell."""
+
+    def __init__(self, coordinator, entry) -> None:
+        super().__init__(coordinator, entry, "debt")
+        self._attr_name = "Задолженность"
+        self._attr_native_unit_of_measurement = "RUB"
+        self._attr_device_class = SensorDeviceClass.MONETARY
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_icon = "mdi:cash"
+
+    @property
+    def native_value(self):
+        return (self.coordinator.data or {}).get("balance")
+
+
+class EisgkhBaseSensor(ZhkhBaseSensor):
+    """Base sensor for an ЕИС ЖКХ personal account."""
+
+    def __init__(self, coordinator, entry, suffix: str) -> None:
+        super().__init__(coordinator, entry, suffix)
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            name=entry.title,
+            manufacturer=PROVIDER_EISGKH_NAME,
+            model="Лицевой счёт",
+            configuration_url="https://lk091.eisgkh.ru/index.htm",
+        )
+
+
+class EisgkhProviderSensor(EisgkhBaseSensor):
+    """Provider name."""
+
+    def __init__(self, coordinator, entry) -> None:
+        super().__init__(coordinator, entry, "provider")
+        self._attr_name = "Поставщик"
+        self._attr_icon = "mdi:domain"
+
+    @property
+    def native_value(self):
+        return (self.coordinator.data or {}).get("provider")
+
+
+class EisgkhDebtSensor(EisgkhBaseSensor):
+    """Payment amount shown by the provider."""
 
     def __init__(self, coordinator, entry) -> None:
         super().__init__(coordinator, entry, "debt")
