@@ -64,17 +64,68 @@ class TceCrimeaClient:
             return ["<unparsed-cookie-header>"]
         return sorted(parsed.keys())
 
-    def _log_request(self, stage: str, method: str, url: str) -> None:
-        """Log request metadata without logging cookie values or form data."""
-        cookie_names = sorted(
-            self._session.cookie_jar.filter_cookies(URL(url)).keys()
-        )
+    @staticmethod
+    def _cookie_metadata(cookies) -> list[dict[str, str | bool | None]]:
+        """Return cookie attributes while always hiding cookie values."""
+        details = []
+        for name, morsel in cookies.items():
+            details.append(
+                {
+                    "name": name,
+                    "value": "<redacted>",
+                    "domain": morsel["domain"] or None,
+                    "path": morsel["path"] or None,
+                    "secure": bool(morsel["secure"]),
+                    "httponly": bool(morsel["httponly"]),
+                    "samesite": morsel["samesite"] or None,
+                    "max_age": morsel["max-age"] or None,
+                    "expires": morsel["expires"] or None,
+                }
+            )
+        return details
+
+    @staticmethod
+    def _safe_form_payload(payload: dict[str, str]) -> dict[str, str]:
+        """Expose ordinary form values but mask credentials and session tokens."""
+        sensitive_fields = {
+            "name",
+            "pass",
+            "password",
+            "form_token",
+            "csrf_token",
+            "token",
+            "access_token",
+            "auth_token",
+            "form_build_id",
+        }
+        safe = {}
+        for name, value in payload.items():
+            if name.lower() in sensitive_fields:
+                safe[name] = f"<redacted; length={len(str(value))}>"
+            else:
+                safe[name] = str(value)
+        return safe
+
+    def _log_request(
+        self,
+        stage: str,
+        method: str,
+        url: str,
+        payload: dict[str, str] | None = None,
+    ) -> None:
+        """Log request metadata and safe form fields, never secret values."""
+        cookie_jar = self._session.cookie_jar.filter_cookies(URL(url))
+        cookie_names = sorted(cookie_jar.keys())
         _LOGGER.debug(
-            "TCE HTTP request: stage=%s method=%s url=%s outgoing_cookie_names=%s",
+            "TCE HTTP request: stage=%s method=%s url=%s "
+            "outgoing_cookie_names=%s outgoing_cookie_attributes=%s "
+            "form_payload=%s",
             stage,
             method,
             URL(url).with_query(None).with_fragment(None),
             cookie_names,
+            self._cookie_metadata(cookie_jar),
+            self._safe_form_payload(payload) if payload is not None else None,
         )
 
     def _log_response(
@@ -98,12 +149,28 @@ class TceCrimeaClient:
         }
 
         response_cookie_names = sorted(response.cookies.keys())
+        response_cookie_details = self._cookie_metadata(response.cookies)
         outgoing_cookie_names = self._cookie_names(
             response.request_info.headers.get("Cookie")
         )
-        jar_cookie_names = sorted(
-            self._session.cookie_jar.filter_cookies(response.url).keys()
-        )
+        jar_cookies = self._session.cookie_jar.filter_cookies(response.url)
+        jar_cookie_names = sorted(jar_cookies.keys())
+        request_headers = {
+            key: response.request_info.headers.get(key)
+            for key in (
+                "User-Agent",
+                "Accept",
+                "Accept-Language",
+                "Origin",
+                "Referer",
+                "Content-Type",
+                "Sec-Fetch-Dest",
+                "Sec-Fetch-Mode",
+                "Sec-Fetch-Site",
+                "Sec-Fetch-User",
+            )
+            if response.request_info.headers.get(key) is not None
+        }
 
         soup = BeautifulSoup(body, "html.parser")
         for node in soup.select("script, style, noscript, .info_column_primary"):
@@ -158,18 +225,22 @@ class TceCrimeaClient:
         log_method = _LOGGER.warning if response.status >= 400 else _LOGGER.debug
         log_method(
             "TCE HTTP %s: status=%s url=%s final_url=%s redirects=%s "
-            "response_headers=%s response_cookie_names=%s "
+            "response_headers=%s request_headers=%s "
+            "response_cookie_names=%s response_cookie_details=%s "
             "response_request_cookie_names=%s cookie_jar_names=%s "
-            "body_length=%s body_preview=%r",
+            "cookie_jar_attributes=%s body_length=%s body_preview=%r",
             stage,
             response.status,
             response.request_info.real_url.with_query(None).with_fragment(None),
             response.url.with_query(None).with_fragment(None),
             redirects,
             safe_headers,
+            request_headers,
             response_cookie_names,
+            response_cookie_details,
             outgoing_cookie_names,
             jar_cookie_names,
+            self._cookie_metadata(jar_cookies),
             len(body),
             text_preview,
         )
@@ -242,7 +313,21 @@ class TceCrimeaClient:
             post_url = urljoin(BASE_URL, action)
             stage = "POST login form"
             request_url = post_url
-            self._log_request(stage, "POST", post_url)
+            _LOGGER.debug(
+                "TCE login form: action=%s method=%s enctype=%s "
+                "field_names=%s hidden_fields=%s",
+                action.split("?", 1)[0],
+                form.get("method"),
+                form.get("enctype"),
+                [field.get("name") for field in form.select("input[name]")],
+                {
+                    field.get("name"): self._safe_form_payload(
+                        {field.get("name"): field.get("value", "")}
+                    )[field.get("name")]
+                    for field in form.select('input[type="hidden"][name]')
+                },
+            )
+            self._log_request(stage, "POST", post_url, payload)
             async with self._session.post(
                 post_url,
                 data=payload,
