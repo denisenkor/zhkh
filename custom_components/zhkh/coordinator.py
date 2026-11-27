@@ -5,6 +5,7 @@ from __future__ import annotations
 import calendar
 import logging
 from datetime import datetime
+from decimal import Decimal
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
@@ -50,17 +51,29 @@ class ZhkhCoordinator(DataUpdateCoordinator):
         self._unsub_time_change = None
 
     async def async_initialize(self) -> None:
-        """Restore persisted update metadata."""
+        """Restore cached balance and update metadata without contacting provider."""
         stored = await self._store.async_load() or {}
         last_updated = stored.get("last_updated")
         if isinstance(last_updated, str):
             self._last_updated = dt_util.parse_datetime(last_updated)
+
         self._last_scheduled_period = stored.get("last_scheduled_period")
+        balance = stored.get("balance")
+        if balance is not None and self._last_updated is not None:
+            self.data = {
+                "balance": Decimal(str(balance)),
+                "last_updated": self._last_updated,
+            }
 
     async def _async_save_metadata(self) -> None:
-        """Persist the last successful update and scheduled month."""
+        """Persist balance and update metadata."""
         await self._store.async_save(
             {
+                "balance": (
+                    str(self.data["balance"])
+                    if self.data and self.data.get("balance") is not None
+                    else None
+                ),
                 "last_updated": (
                     self._last_updated.isoformat() if self._last_updated else None
                 ),
@@ -82,18 +95,26 @@ class ZhkhCoordinator(DataUpdateCoordinator):
             ) from err
 
         self._last_updated = dt_util.now()
-        try:
-            await self._async_save_metadata()
-        except Exception:  # noqa: BLE001
-            _LOGGER.warning("Не удалось сохранить дату обновления ЖКХ")
-
-        return {
+        result = {
             "balance": balance,
             "last_updated": self._last_updated,
         }
+        # Keep a usable cache across Home Assistant restarts.
+        try:
+            await self._store.async_save(
+                {
+                    "balance": str(balance),
+                    "last_updated": self._last_updated.isoformat(),
+                    "last_scheduled_period": self._last_scheduled_period,
+                }
+            )
+        except Exception:  # noqa: BLE001
+            _LOGGER.warning("Не удалось сохранить данные ЖКХ для восстановления после перезапуска")
+
+        return result
 
     async def async_start_schedule(self) -> None:
-        """Start the daily scheduler and catch up after a missed schedule."""
+        """Start the monthly scheduler; startup itself never triggers an update."""
         self._unsub_time_change = async_track_time_change(
             self.hass,
             self._handle_time_change,
@@ -101,42 +122,23 @@ class ZhkhCoordinator(DataUpdateCoordinator):
             minute=0,
             second=0,
         )
-        await self._async_check_schedule(startup=True)
 
     @callback
     def _handle_time_change(self, now: datetime) -> None:
         """Check the monthly schedule at 06:00 local Home Assistant time."""
-        self.hass.async_create_task(self._async_check_schedule())
+        self.hass.async_create_task(self._async_check_schedule(now))
 
-    async def _async_check_schedule(self, startup: bool = False) -> None:
-        """Run the monthly update once, including after downtime."""
-        now = dt_util.now()
+    async def _async_check_schedule(self, now: datetime | None = None) -> None:
+        """Update only on the configured calendar day at 06:00."""
+        now = now or dt_util.now()
         days_in_month = calendar.monthrange(now.year, now.month)[1]
         scheduled_day = min(self.update_day, days_in_month)
 
-        if now.day >= scheduled_day:
-            period_date = now
-        else:
-            # If HA was offline across the month boundary, catch up the
-            # previous month's missed run after the next startup.
-            year = now.year
-            month = now.month - 1
-            if month == 0:
-                year -= 1
-                month = 12
-            period_date = now.replace(year=year, month=month, day=1)
-
-        period = period_date.strftime("%Y-%m")
-        if self._last_scheduled_period == period:
+        if now.day != scheduled_day:
             return
 
-        # A successful initial refresh also satisfies a missed monthly run.
-        if startup and self.last_update_success:
-            self._last_scheduled_period = period
-            try:
-                await self._async_save_metadata()
-            except Exception:  # noqa: BLE001
-                _LOGGER.warning("Не удалось сохранить расписание обновления ЖКХ")
+        period = now.strftime("%Y-%m")
+        if self._last_scheduled_period == period:
             return
 
         await self.async_refresh()
