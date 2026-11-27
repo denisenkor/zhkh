@@ -169,7 +169,7 @@ class CrimeaEcorDebtSensor(CrimeaEcorBaseSensor):
 
 
 class EisgkhBaseSensor(ZhkhBaseSensor):
-    """Base sensor for an ЕИС ЖКХ personal account."""
+    """Base sensor for НО «РФ КРМД РК» personal account."""
 
     def __init__(self, coordinator, entry, suffix: str) -> None:
         super().__init__(coordinator, entry, suffix)
@@ -178,7 +178,7 @@ class EisgkhBaseSensor(ZhkhBaseSensor):
             name=entry.title,
             manufacturer=PROVIDER_EISGKH_NAME,
             model="Лицевой счёт",
-            configuration_url="https://lk091.eisgkh.ru/index.htm",
+            configuration_url="http://kaprem82.ru/",
         )
 
 
