@@ -12,6 +12,8 @@ from .const import (
     PROVIDER_CRIMEA_ENERGY,
     PROVIDER_CRIMEAGASNET,
     PROVIDER_CRIMEAGASNET_NAME,
+    PROVIDER_CRIMEA_ECOR,
+    PROVIDER_CRIMEA_ECOR_NAME,
 )
 from .coordinator import ZhkhCoordinator
 
@@ -56,6 +58,24 @@ async def async_setup_entry(
                 )
             )
         async_add_entities(entities)
+        return
+
+    if coordinator.provider == PROVIDER_CRIMEA_ECOR:
+        async_add_entities(
+            [
+                RefreshButton(
+                    coordinator,
+                    f"{entry.entry_id}_refresh",
+                    DeviceInfo(
+                        identifiers={(DOMAIN, entry.entry_id)},
+                        name=entry.title,
+                        manufacturer=PROVIDER_CRIMEA_ECOR_NAME,
+                        model="Лицевой счёт",
+                        configuration_url="https://lk.crimea-ecor.ru/index.htm",
+                    ),
+                )
+            ]
+        )
         return
 
     if coordinator.provider == PROVIDER_CRIMEAGASNET:
