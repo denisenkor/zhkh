@@ -16,8 +16,14 @@ from .const import (
     CONF_UPDATE_DAY,
     DEFAULT_UPDATE_DAY,
     DOMAIN,
+    PROVIDER_CRIMEA_ENERGY,
+    PROVIDER_CRIMEA_ENERGY_NAME,
     PROVIDER_TCE,
     PROVIDER_TCE_NAME,
+)
+from .connectors.crimea_energy import (
+    CrimeaEnergyAuthError,
+    CrimeaEnergyClient,
 )
 from .connectors.tce_crimea import TceCrimeaAuthError, TceCrimeaClient
 
@@ -33,7 +39,7 @@ class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Select provider."""
         return self.async_show_menu(
             step_id="user",
-            menu_options=["tce_crimea"],
+            menu_options=["tce_crimea", "crimea_energy"],
         )
 
     async def async_step_tce_crimea(self, user_input=None):
@@ -88,6 +94,59 @@ class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=schema,
             errors=errors,
             description_placeholders={"provider": PROVIDER_TCE_NAME},
+        )
+
+    async def async_step_crimea_energy(self, user_input=None):
+        """Configure a Crimea Energy account."""
+        errors = {}
+        if user_input is not None:
+            email = user_input["email"].strip()
+            email_key = hashlib.sha256(email.lower().encode("utf-8")).hexdigest()[:20]
+            await self.async_set_unique_id(
+                f"{PROVIDER_CRIMEA_ENERGY}_{email_key}"
+            )
+            self._abort_if_unique_id_configured()
+
+            client = CrimeaEnergyClient(email, user_input[CONF_PASSWORD])
+            try:
+                await client.async_get_bills()
+            except CrimeaEnergyAuthError:
+                errors["base"] = "invalid_auth"
+            except HomeAssistantError as err:
+                _LOGGER.warning(
+                    "Crimea Energy validation failed (%s): %s",
+                    type(err).__name__,
+                    str(err),
+                )
+                errors["base"] = "cannot_connect"
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.error(
+                    "Unexpected Crimea Energy validation error (%s)",
+                    type(err).__name__,
+                )
+                errors["base"] = "cannot_connect"
+            finally:
+                await client.async_close()
+
+            if not errors:
+                return self.async_create_entry(
+                    title=f"{PROVIDER_CRIMEA_ENERGY_NAME} ({email})",
+                    data={
+                        CONF_PROVIDER: PROVIDER_CRIMEA_ENERGY,
+                        "email": email,
+                        CONF_PASSWORD: user_input[CONF_PASSWORD],
+                    },
+                )
+
+        schema = vol.Schema(
+            {
+                vol.Required("email"): str,
+                vol.Required(CONF_PASSWORD): str,
+            }
+        )
+        return self.async_show_form(
+            step_id="crimea_energy",
+            data_schema=schema,
         )
 
     @staticmethod
