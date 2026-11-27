@@ -128,7 +128,7 @@ class CrimeaGasnetClient:
             raise HomeAssistantError("Таблица лицевых счетов не найдена")
 
         accounts = []
-        for row in table.select("tbody tr"):
+        for row in table.select("tr"):
             cells = row.find_all("td", recursive=False)
             if len(cells) < 5:
                 continue
