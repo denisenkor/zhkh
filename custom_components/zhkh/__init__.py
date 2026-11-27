@@ -19,7 +19,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up a configured provider account."""
     coordinator = ZhkhCoordinator(hass, entry)
     await coordinator.async_initialize()
-    await coordinator.async_config_entry_first_refresh()
+
+    # Fetch data only for a new entry without a previously saved cache.
+    # On restart, restore the cached state and wait for the next scheduled/manual update.
+    if coordinator.data is None:
+        await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
