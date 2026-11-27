@@ -292,9 +292,30 @@ class TceCrimeaClient:
 
             self._ensure_browser_cookies()
             soup = BeautifulSoup(login_html, "html.parser")
-            form = soup.select_one("form#user-login-form")
+            form = None
+            for candidate in soup.select("form"):
+                form_id_field = candidate.select_one(
+                    'input[name="form_id"]'
+                )
+                if (
+                    form_id_field is not None
+                    and form_id_field.get("value") == "user_login_central_block"
+                ):
+                    form = candidate
+                    break
+
             if form is None:
-                raise HomeAssistantError("Login form was not found")
+                available_form_ids = [
+                    field.get("value")
+                    for field in soup.select('form input[name="form_id"]')
+                ]
+                _LOGGER.warning(
+                    "TCE expected login form was not found; available form_ids=%s",
+                    available_form_ids,
+                )
+                raise HomeAssistantError(
+                    "Expected central login form was not found"
+                )
 
             payload = {
                 "name": self._account,
