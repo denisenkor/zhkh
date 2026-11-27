@@ -63,6 +63,19 @@ class TceCrimeaClient:
             return ["<unparsed-cookie-header>"]
         return sorted(parsed.keys())
 
+    def _log_request(self, stage: str, method: str, url: str) -> None:
+        """Log request metadata without logging cookie values or form data."""
+        cookie_names = sorted(
+            self._session.cookie_jar.filter_cookies(URL(url)).keys()
+        )
+        _LOGGER.debug(
+            "TCE HTTP request: stage=%s method=%s url=%s outgoing_cookie_names=%s",
+            stage,
+            method,
+            URL(url).with_query(None).with_fragment(None),
+            cookie_names,
+        )
+
     def _log_response(
         self, stage: str, response: aiohttp.ClientResponse, body: str
     ) -> None:
@@ -127,7 +140,7 @@ class TceCrimeaClient:
         log_method(
             "TCE HTTP %s: status=%s url=%s final_url=%s redirects=%s "
             "response_headers=%s response_cookie_names=%s "
-            "outgoing_cookie_names=%s cookie_jar_names=%s "
+            "response_request_cookie_names=%s cookie_jar_names=%s "
             "body_length=%s body_preview=%r",
             stage,
             response.status,
@@ -167,6 +180,7 @@ class TceCrimeaClient:
 
     async def _async_get_services_html(self, stage: str) -> tuple[str, str]:
         """Fetch services page and return its HTML and final URL."""
+        self._log_request(stage, "GET", SERVICES_URL)
         async with self._session.get(
             SERVICES_URL, headers={"Referer": LOGIN_REFERER}
         ) as response:
@@ -180,6 +194,7 @@ class TceCrimeaClient:
         stage = "GET login page"
         request_url = LOGIN_URL
         try:
+            self._log_request(stage, "GET", LOGIN_URL)
             async with self._session.get(LOGIN_URL) as response:
                 login_html = await response.text()
                 self._log_response(stage, response, login_html)
@@ -208,6 +223,7 @@ class TceCrimeaClient:
             post_url = urljoin(BASE_URL, action)
             stage = "POST login form"
             request_url = post_url
+            self._log_request(stage, "POST", post_url)
             async with self._session.post(
                 post_url,
                 data=payload,
