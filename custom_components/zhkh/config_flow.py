@@ -144,7 +144,7 @@ class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     data={
                         CONF_PROVIDER: PROVIDER_CRIMEA_ENERGY,
                         "email": email,
-                        CONF_PASSWORD: user_input[CONF_PASSWORD],
+                        CONF_PASSWORD: user_input["crimea_energy_password"],
                     },
                 )
 
