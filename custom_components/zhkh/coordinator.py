@@ -25,6 +25,7 @@ from .connectors.crimeagasnet import (
     CrimeaGasnetConnectionError,
 )
 from .connectors.crimea_ecor import CrimeaEcorClient, CrimeaEcorConnectionError
+from .connectors.eisgkh import EisgkhClient, EisgkhConnectionError
 from .connectors.tce_crimea import TceCrimeaClient, TceCrimeaConnectionError
 from .const import (
     CONF_ACCOUNT,
@@ -36,6 +37,7 @@ from .const import (
     PROVIDER_CRIMEA_ENERGY,
     PROVIDER_CRIMEAGASNET,
     PROVIDER_CRIMEA_ECOR,
+    PROVIDER_EISGKH,
     UPDATE_HOUR,
 )
 
@@ -67,6 +69,10 @@ class ZhkhCoordinator(DataUpdateCoordinator):
             )
         elif self.provider == PROVIDER_CRIMEA_ECOR:
             self.client = CrimeaEcorClient(
+                entry.data[CONF_ACCOUNT], entry.data[CONF_PASSWORD]
+            )
+        elif self.provider == PROVIDER_EISGKH:
+            self.client = EisgkhClient(
                 entry.data[CONF_ACCOUNT], entry.data[CONF_PASSWORD]
             )
         else:
@@ -102,7 +108,7 @@ class ZhkhCoordinator(DataUpdateCoordinator):
                 except (KeyError, InvalidOperation, TypeError, ValueError):
                     continue
             self.data = {"bills": bills, "last_updated": self._last_updated}
-        elif self.provider == PROVIDER_CRIMEA_ECOR:
+        elif self.provider in (PROVIDER_CRIMEA_ECOR, PROVIDER_EISGKH):
             balance = stored.get("balance")
             self.data = {
                 "provider": stored.get("provider"),
@@ -140,7 +146,7 @@ class ZhkhCoordinator(DataUpdateCoordinator):
                 }
                 for bill in result.get("bills", [])
             ]
-        elif self.provider == PROVIDER_CRIMEA_ECOR:
+        elif self.provider in (PROVIDER_CRIMEA_ECOR, PROVIDER_EISGKH):
             balance = result.get("balance")
             stored["provider"] = result.get("provider")
             stored["balance"] = str(balance) if balance is not None else None
@@ -168,6 +174,7 @@ class ZhkhCoordinator(DataUpdateCoordinator):
             CrimeaEnergyConnectionError,
             CrimeaGasnetConnectionError,
             CrimeaEcorConnectionError,
+            EisgkhConnectionError,
         )
         for attempt in range(1, _UPDATE_ATTEMPTS + 1):
             try:
@@ -177,7 +184,7 @@ class ZhkhCoordinator(DataUpdateCoordinator):
                 elif self.provider == PROVIDER_CRIMEAGASNET:
                     accounts = await self.client.async_get_accounts()
                     result = {"accounts": accounts}
-                elif self.provider == PROVIDER_CRIMEA_ECOR:
+                elif self.provider in (PROVIDER_CRIMEA_ECOR, PROVIDER_EISGKH):
                     result = await self.client.async_get_data()
                 else:
                     balance = await self.client.async_get_balance()
