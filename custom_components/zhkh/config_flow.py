@@ -76,7 +76,6 @@ class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_ACCOUNT: account,
                         CONF_PASSWORD: user_input[CONF_PASSWORD],
                     },
-                    options={CONF_UPDATE_DAY: DEFAULT_UPDATE_DAY},
                 )
 
         schema = vol.Schema(
