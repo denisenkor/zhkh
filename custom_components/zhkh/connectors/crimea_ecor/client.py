@@ -77,7 +77,23 @@ class CrimeaEcorClient:
         soup = BeautifulSoup(login_html, "html.parser")
         form = soup.select_one('form[name="auth"]')
         if form is None:
-            raise HomeAssistantError("На странице входа не найдена форма авторизации")
+            # An existing authenticated session may open the account page
+            # directly instead of showing the login form.
+            if soup.select_one("table.service.hover") is not None:
+                self._logged_in = True
+                return
+
+            info_html = await self._request(
+                "GET", INFO_URL, stage="проверка авторизованной страницы лицевого счёта"
+            )
+            info_soup = BeautifulSoup(info_html, "html.parser")
+            if info_soup.select_one("table.service.hover") is not None:
+                self._logged_in = True
+                return
+
+            raise HomeAssistantError(
+                "На странице входа не найдена форма авторизации"
+            )
 
         path_input = form.select_one('input[type="hidden"][name="path"]')
         if path_input is None or not path_input.get("value"):
