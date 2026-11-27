@@ -59,9 +59,9 @@ class ZhkhCoordinator(DataUpdateCoordinator):
 
         self._last_scheduled_period = stored.get("last_scheduled_period")
         balance = stored.get("balance")
-        if balance is not None and self._last_updated is not None:
+        if self._last_updated is not None:
             self.data = {
-                "balance": Decimal(str(balance)),
+                "balance": Decimal(str(balance)) if balance is not None else None,
                 "last_updated": self._last_updated,
             }
 
