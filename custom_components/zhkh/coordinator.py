@@ -16,13 +16,19 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
+from .connectors.crimea_energy import (
+    CrimeaEnergyClient,
+    CrimeaEnergyConnectionError,
+)
 from .connectors.tce_crimea import TceCrimeaClient, TceCrimeaConnectionError
 from .const import (
     CONF_ACCOUNT,
     CONF_PASSWORD,
+    CONF_PROVIDER,
     CONF_UPDATE_DAY,
     DEFAULT_UPDATE_DAY,
     DOMAIN,
+    PROVIDER_CRIMEA_ENERGY,
     UPDATE_HOUR,
 )
 
@@ -33,7 +39,7 @@ _RETRY_DELAY = 10
 
 
 class ZhkhCoordinator(DataUpdateCoordinator):
-    """Coordinate updates for one utility account."""
+    """Coordinate updates for one utility provider login."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         super().__init__(
@@ -43,9 +49,15 @@ class ZhkhCoordinator(DataUpdateCoordinator):
             update_interval=None,
         )
         self.entry = entry
-        self.client = TceCrimeaClient(
-            entry.data[CONF_ACCOUNT], entry.data[CONF_PASSWORD]
-        )
+        self.provider = entry.data.get(CONF_PROVIDER)
+        if self.provider == PROVIDER_CRIMEA_ENERGY:
+            self.client = CrimeaEnergyClient(
+                entry.data["email"], entry.data[CONF_PASSWORD]
+            )
+        else:
+            self.client = TceCrimeaClient(
+                entry.data[CONF_ACCOUNT], entry.data[CONF_PASSWORD]
+            )
         self.update_day = int(
             entry.options.get(CONF_UPDATE_DAY, DEFAULT_UPDATE_DAY)
         )
@@ -55,49 +67,76 @@ class ZhkhCoordinator(DataUpdateCoordinator):
         self._unsub_time_change = None
 
     async def async_initialize(self) -> None:
-        """Restore cached balance and update metadata without contacting provider."""
+        """Restore cached data and update metadata without contacting provider."""
         stored = await self._store.async_load() or {}
         last_updated = stored.get("last_updated")
         if isinstance(last_updated, str):
             self._last_updated = dt_util.parse_datetime(last_updated)
 
         self._last_scheduled_period = stored.get("last_scheduled_period")
-        balance = stored.get("balance")
-        if self._last_updated is not None:
+        if self._last_updated is None:
+            return
+
+        if self.provider == PROVIDER_CRIMEA_ENERGY:
+            bills = []
+            for bill in stored.get("bills", []):
+                try:
+                    restored = dict(bill)
+                    restored["balance"] = Decimal(str(restored["balance"]))
+                    bills.append(restored)
+                except (KeyError, InvalidOperation, TypeError, ValueError):
+                    continue
+            self.data = {"bills": bills, "last_updated": self._last_updated}
+        else:
+            balance = stored.get("balance")
             self.data = {
                 "balance": Decimal(str(balance)) if balance is not None else None,
                 "last_updated": self._last_updated,
             }
 
+    async def _async_store_data(self, result: dict) -> None:
+        """Persist the latest successful response."""
+        stored = {
+            "last_updated": self._last_updated.isoformat() if self._last_updated else None,
+            "last_scheduled_period": self._last_scheduled_period,
+        }
+        if self.provider == PROVIDER_CRIMEA_ENERGY:
+            stored["bills"] = [
+                {
+                    **bill,
+                    "balance": str(bill["balance"]),
+                }
+                for bill in result.get("bills", [])
+            ]
+        else:
+            balance = result.get("balance")
+            stored["balance"] = str(balance) if balance is not None else None
+        await self._store.async_save(stored)
+
     async def _async_save_metadata(self) -> None:
-        """Persist balance and update metadata."""
-        await self._store.async_save(
-            {
-                "balance": (
-                    str(self.data["balance"])
-                    if self.data and self.data.get("balance") is not None
-                    else None
-                ),
-                "last_updated": (
-                    self._last_updated.isoformat() if self._last_updated else None
-                ),
-                "last_scheduled_period": self._last_scheduled_period,
-            }
-        )
+        """Persist scheduling metadata without losing cached provider data."""
+        if self.data is not None:
+            await self._async_store_data(self.data)
 
     async def _async_update_data(self):
+        retryable_errors = (TceCrimeaConnectionError, CrimeaEnergyConnectionError)
         for attempt in range(1, _UPDATE_ATTEMPTS + 1):
             try:
-                balance = await self.client.async_get_balance()
+                if self.provider == PROVIDER_CRIMEA_ENERGY:
+                    bills = await self.client.async_get_bills()
+                    result = {"bills": bills}
+                else:
+                    balance = await self.client.async_get_balance()
+                    result = {"balance": balance}
                 break
-            except TceCrimeaConnectionError as err:
+            except retryable_errors as err:
                 if attempt >= _UPDATE_ATTEMPTS:
                     raise UpdateFailed(
-                        f"Не удалось получить задолженность после {_UPDATE_ATTEMPTS} попыток: {err}"
+                        f"Не удалось получить данные после {_UPDATE_ATTEMPTS} попыток: {err}"
                     ) from err
 
                 _LOGGER.warning(
-                    "Ошибка соединения при получении задолженности "
+                    "Ошибка соединения при получении данных ЖКХ "
                     "(попытка %s из %s). Повтор через %s секунд: %s",
                     attempt,
                     _UPDATE_ATTEMPTS,
@@ -106,32 +145,21 @@ class ZhkhCoordinator(DataUpdateCoordinator):
                 )
                 await asyncio.sleep(_RETRY_DELAY)
             except HomeAssistantError as err:
-                raise UpdateFailed(
-                    f"Не удалось получить задолженность: {err}"
-                ) from err
+                raise UpdateFailed(f"Не удалось получить данные ЖКХ: {err}") from err
             except Exception as err:  # noqa: BLE001
                 raise UpdateFailed(
-                    "Не удалось получить задолженность "
+                    "Не удалось получить данные ЖКХ "
                     f"из-за внутренней ошибки ({type(err).__name__})."
                 ) from err
 
         self._last_updated = dt_util.now()
-        result = {
-            "balance": balance,
-            "last_updated": self._last_updated,
-        }
-        # Keep a usable cache across Home Assistant restarts.
+        result["last_updated"] = self._last_updated
         try:
-            await self._store.async_save(
-                {
-                    "balance": str(balance),
-                    "last_updated": self._last_updated.isoformat(),
-                    "last_scheduled_period": self._last_scheduled_period,
-                }
-            )
+            await self._async_store_data(result)
         except Exception:  # noqa: BLE001
-            _LOGGER.warning("Не удалось сохранить данные ЖКХ для восстановления после перезапуска")
-
+            _LOGGER.warning(
+                "Не удалось сохранить данные ЖКХ для восстановления после перезапуска"
+            )
         return result
 
     async def async_start_schedule(self) -> None:
