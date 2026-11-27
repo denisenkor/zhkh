@@ -1,6 +1,6 @@
 {
   "domain": "zhkh",
-  "name": "ЖКХ",
+  "name": "ЖКХ Крым",
   "codeowners": [
     "@denisenkor"
   ],
@@ -10,5 +10,5 @@
   "requirements": [
     "beautifulsoup4>=4.12.3"
   ],
-  "version": "0.1.35"
+  "version": "0.1.36"
 }
