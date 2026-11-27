@@ -14,6 +14,8 @@ from .const import (
     CONF_ACCOUNT,
     CONF_PASSWORD,
     CONF_PROVIDER,
+    CONF_UPDATE_DAY,
+    DEFAULT_UPDATE_DAY,
     DOMAIN,
     PROVIDER_TCE,
     PROVIDER_TCE_NAME,
@@ -51,8 +53,6 @@ class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             except TceCrimeaAuthError:
                 errors["base"] = "invalid_auth"
             except HomeAssistantError as err:
-                # Connector errors contain only our fixed diagnostics or HTTP status;
-                # never log credentials, cookies, response bodies, or form payloads.
                 _LOGGER.warning(
                     "Provider validation failed (%s): %s",
                     type(err).__name__,
@@ -60,7 +60,6 @@ class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
                 errors["base"] = "cannot_connect"
             except Exception as err:  # noqa: BLE001
-                # Never log exception text: request details may contain credentials.
                 _LOGGER.error(
                     "Unexpected provider validation error (%s)",
                     type(err).__name__,
@@ -77,6 +76,7 @@ class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_ACCOUNT: account,
                         CONF_PASSWORD: user_input[CONF_PASSWORD],
                     },
+                    options={CONF_UPDATE_DAY: DEFAULT_UPDATE_DAY},
                 )
 
         schema = vol.Schema(
@@ -91,3 +91,32 @@ class ZhkhConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
             description_placeholders={"provider": PROVIDER_TCE_NAME},
         )
+
+    @staticmethod
+    def async_get_options_flow(config_entry):
+        """Return the options flow."""
+        return ZhkhOptionsFlow(config_entry)
+
+
+class ZhkhOptionsFlow(config_entries.OptionsFlow):
+    """Configure the monthly update day."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        self.config_entry = config_entry
+
+    async def async_step_init(self, user_input=None):
+        """Manage integration options."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_UPDATE_DAY,
+                    default=self.config_entry.options.get(
+                        CONF_UPDATE_DAY, DEFAULT_UPDATE_DAY
+                    ),
+                ): vol.In(list(range(1, 32)))
+            }
+        )
+        return self.async_show_form(step_id="init", data_schema=schema)
