@@ -6,7 +6,6 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CURRENCY_RUB
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -60,7 +59,7 @@ class BalanceSensor(ZhkhBaseSensor):
     def __init__(self, coordinator, entry) -> None:
         super().__init__(coordinator, entry, "balance")
         self._attr_name = "Задолженность"
-        self._attr_native_unit_of_measurement = CURRENCY_RUB
+        self._attr_native_unit_of_measurement = "RUB"
         self._attr_device_class = SensorDeviceClass.MONETARY
         self._attr_state_class = SensorStateClass.MEASUREMENT
 
