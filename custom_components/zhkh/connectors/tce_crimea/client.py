@@ -35,6 +35,24 @@ class TceCrimeaAuthError(HomeAssistantError):
     """The provider rejected the supplied credentials."""
 
 
+class TceCrimeaConnectionError(HomeAssistantError):
+    """A temporary network error occurred while contacting the provider."""
+
+
+def _connection_error(stage: str, err: Exception) -> HomeAssistantError:
+    """Convert HTTP transport errors and keep retryable failures distinguishable."""
+    if isinstance(err, aiohttp.ClientResponseError):
+        status = f"HTTP {err.status}"
+        message = f"Ошибка соединения при {stage} ({status})"
+        if err.status not in (408, 429) and err.status < 500:
+            return HomeAssistantError(message)
+        return TceCrimeaConnectionError(message)
+
+    return TceCrimeaConnectionError(
+        f"Ошибка соединения при {stage} ({type(err).__name__})"
+    )
+
+
 class TceCrimeaClient:
     """Authenticate with the provider and parse the current account balance."""
 
@@ -151,14 +169,7 @@ class TceCrimeaClient:
         except (TceCrimeaAuthError, HomeAssistantError):
             raise
         except (aiohttp.ClientError, TimeoutError) as err:
-            status = (
-                f"HTTP {err.status}"
-                if isinstance(err, aiohttp.ClientResponseError)
-                else type(err).__name__
-            )
-            raise HomeAssistantError(
-                f"Ошибка соединения при {stage} ({status})"
-            ) from err
+            raise _connection_error(stage, err) from err
 
     async def async_get_balance(self) -> Decimal:
         """Get balance from the authenticated services page."""
@@ -189,14 +200,7 @@ class TceCrimeaClient:
         except (TceCrimeaAuthError, HomeAssistantError):
             raise
         except (aiohttp.ClientError, TimeoutError) as err:
-            status = (
-                f"HTTP {err.status}"
-                if isinstance(err, aiohttp.ClientResponseError)
-                else type(err).__name__
-            )
-            raise HomeAssistantError(
-                f"Не удалось загрузить данные личного кабинета ({status})"
-            ) from err
+            raise _connection_error("загрузка данных личного кабинета", err) from err
 
     @staticmethod
     def _parse_balance(html: str) -> Decimal:
